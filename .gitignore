@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build
+.next/
+out/
+
+# Storybook build
+storybook-static/
+
+# Testing & Coverage
+coverage/
+playwright-report/
+test-results/
+
+# Env & OS
+.env*.local
+.DS_Store
+*.log
+*.tsbuildinfo
+.env

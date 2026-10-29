@@ -1,0 +1,130 @@
+/* DO NOT EDIT. Update by re-converting the designer's source file. */
+
+:root {
+  /* Neutral Color Ramp */
+  --colors-neutral-0: #ffffff;
+  --colors-neutral-50: #f9fafb;
+  --colors-neutral-100: #f3f4f6;
+  --colors-neutral-200: #e5e7eb;
+  --colors-neutral-300: #d1d5db;
+  --colors-neutral-400: #9ca3af;
+  --colors-neutral-500: #6b7280;
+  --colors-neutral-600: #4b5563;
+  --colors-neutral-700: #374151;
+  --colors-neutral-800: #1f2937;
+  --colors-neutral-900: #111827;
+  --colors-neutral-950: #030712;
+  --colors-neutral-1000: #000000;
+
+  /* Blue Color Ramp */
+  --colors-blue-50: #eff6ff;
+  --colors-blue-100: #dbeafe;
+  --colors-blue-200: #bfdbfe;
+  --colors-blue-300: #93c5fd;
+  --colors-blue-400: #60a5fa;
+  --colors-blue-500: #0052cc;
+  --colors-blue-600: #0043a8;
+  --colors-blue-700: #1d4ed8;
+  --colors-blue-800: #1e40af;
+  --colors-blue-900: #1e3a8a;
+  --colors-blue-950: #172554;
+
+  /* Green Color Ramp */
+  --colors-green-50: #f0fdf4;
+  --colors-green-100: #dcfce7;
+  --colors-green-200: #bbf7d0;
+  --colors-green-300: #86efac;
+  --colors-green-400: #4ade80;
+  --colors-green-500: #22c55e;
+  --colors-green-600: #16a34a;
+  --colors-green-700: #15803d;
+  --colors-green-800: #166534;
+  --colors-green-900: #14532d;
+  --colors-green-950: #052e16;
+
+  /* Amber Color Ramp */
+  --colors-amber-50: #fffbeb;
+  --colors-amber-100: #fef3c7;
+  --colors-amber-200: #fde68a;
+  --colors-amber-300: #fcd34d;
+  --colors-amber-400: #fbbf24;
+  --colors-amber-500: #f59e0b;
+  --colors-amber-600: #d97706;
+  --colors-amber-700: #b45309;
+  --colors-amber-800: #92400e;
+  --colors-amber-900: #78350f;
+  --colors-amber-950: #451a03;
+
+  /* Red Color Ramp */
+  --colors-red-50: #fef2f2;
+  --colors-red-100: #fee2e2;
+  --colors-red-200: #fecaca;
+  --colors-red-300: #fca5a5;
+  --colors-red-400: #f87171;
+  --colors-red-500: #ef4444;
+  --colors-red-600: #dc2626;
+  --colors-red-700: #b91c1c;
+  --colors-red-800: #991b1b;
+  --colors-red-900: #7f1d1d;
+  --colors-red-950: #450a0a;
+
+  /* Sky Color Ramp */
+  --colors-sky-50: #f0f9ff;
+  --colors-sky-100: #e0f2fe;
+  --colors-sky-200: #bae6fd;
+  --colors-sky-300: #7dd3fc;
+  --colors-sky-400: #38bdf8;
+  --colors-sky-500: #0ea5e9;
+  --colors-sky-600: #0284c7;
+  --colors-sky-700: #0369a1;
+  --colors-sky-800: #075985;
+  --colors-sky-900: #0c4a6e;
+  --colors-sky-950: #082f49;
+
+  /* Violet Color Ramp */
+  --colors-violet-50: #f5f3ff;
+  --colors-violet-100: #ede9fe;
+  --colors-violet-200: #ddd6fe;
+  --colors-violet-300: #c4b5fd;
+  --colors-violet-400: #a78bfa;
+  --colors-violet-500: #8b5cf6;
+  --colors-violet-600: #7c3aed;
+  --colors-violet-700: #6d28d9;
+  --colors-violet-800: #5b21b6;
+  --colors-violet-900: #4c1d95;
+  --colors-violet-950: #2e1065;
+
+  /* Yellow Color Ramp */
+  --colors-yellow-50: #fefce8;
+  --colors-yellow-100: #fef9c3;
+  --colors-yellow-200: #fef08a;
+  --colors-yellow-300: #fde047;
+  --colors-yellow-400: #facc15;
+  --colors-yellow-500: #eab308;
+  --colors-yellow-600: #ca8a04;
+  --colors-yellow-700: #a16207;
+  --colors-yellow-800: #854d0e;
+  --colors-yellow-900: #713f12;
+  --colors-yellow-950: #422006;
+
+  /* Spacing Primitives */
+  --spacing-0: 0px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* Radius Primitives */
+  --radius-none: 0px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+}

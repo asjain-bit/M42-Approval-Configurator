@@ -1,0 +1,132 @@
+@import 'tailwindcss';
+@import '../styles/tokens/primitives.css';
+@import '../styles/tokens/light.css';
+@import '../styles/tokens/dark.css';
+@import '../styles/tokens/brand.css';
+
+@theme {
+  --color-bg-default: var(--bg-default);
+  --color-bg-surface-1: var(--bg-surface-1);
+  --color-bg-surface-2: var(--bg-surface-2);
+  --color-bg-surface-3: var(--bg-surface-3);
+  --color-bg-surface-4: var(--bg-surface-4);
+  --color-bg-surface-5: var(--bg-surface-5);
+  --color-bg-overlay: var(--bg-overlay);
+  --color-bg-input: var(--bg-input);
+  --color-bg-tooltip: var(--bg-tooltip);
+  --color-bg-modal: var(--bg-modal);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-hover: var(--bg-hover);
+  --color-bg-pressed: var(--bg-pressed);
+  --color-bg-selected: var(--bg-selected);
+  --color-bg-disabled: var(--bg-disabled);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-placeholder: var(--text-placeholder);
+  --color-text-inverse: var(--text-inverse);
+  --color-text-on-primary: var(--text-on-primary);
+  --color-text-accent: var(--text-accent);
+  --color-text-link: var(--text-link);
+  --color-text-success: var(--text-success);
+  --color-text-warning: var(--text-warning);
+  --color-text-error: var(--text-error);
+  --color-text-info: var(--text-info);
+
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-border-focus: var(--border-focus);
+
+  --color-action-primary-bg-default: var(--action-primary-bg-default);
+  --color-action-primary-bg-hover: var(--action-primary-bg-hover);
+  --color-action-primary-bg-pressed: var(--action-primary-bg-pressed);
+  --color-action-primary-text: var(--action-primary-text);
+  --color-action-primary-bg-soft: var(--action-primary-bg-soft);
+
+  --color-action-destructive-bg-default: var(--action-destructive-bg-default);
+  --color-action-destructive-bg-hover: var(--action-destructive-bg-hover);
+  --color-action-destructive-text: var(--action-destructive-text);
+
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-success-border: var(--status-success-border);
+  --color-status-success-icon: var(--status-success-icon);
+
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-warning-text: var(--status-warning-text);
+  --color-status-warning-border: var(--status-warning-border);
+  --color-status-warning-icon: var(--status-warning-icon);
+
+  --color-status-error-bg: var(--status-error-bg);
+  --color-status-error-text: var(--status-error-text);
+  --color-status-error-border: var(--status-error-border);
+  --color-status-error-icon: var(--status-error-icon);
+
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-info-text: var(--status-info-text);
+  --color-status-info-border: var(--status-info-border);
+  --color-status-info-icon: var(--status-info-icon);
+
+  --font-sans: var(--font-sans, system-ui, sans-serif);
+  --font-serif: var(--font-serif, Georgia, serif);
+}
+
+body {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  background-color: var(--bg-default);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.font-serif {
+  font-family: var(--font-serif, Georgia, serif);
+}
+
+strong,
+b {
+  font-weight: 600;
+}
+
+/* Briefly highlight a form field reached via "Go to" or an edge selection */
+@keyframes field-flash {
+  0% {
+    box-shadow: 0 0 0 3px rgb(203 213 225 / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgb(203 213 225 / 0);
+  }
+}
+.field-flash {
+  animation: field-flash 1.6s ease-out;
+}
+
+/* React Flow: match the M42 look */
+.react-flow__controls-button {
+  border-bottom-color: #e2e8f0;
+}
+.react-flow__handle {
+  transition: transform 0.1s;
+}
+.react-flow__handle:hover {
+  transform: translate(-50%, 50%) scale(1.35);
+}
+.react-flow__handle-top:hover {
+  transform: translate(-50%, -50%) scale(1.35);
+}
+
+/* Dropdowns: our own chevron with room on the right instead of the browser's, which sits against the edge */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  background-size: 1rem 1rem;
+  text-overflow: ellipsis;
+}

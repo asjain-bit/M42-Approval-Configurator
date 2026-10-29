@@ -1,0 +1,62 @@
+/*
+ * BRAND OVERRIDES (WHITE-LABEL CUSTOMIZATION)
+ *
+ * This file is the ONLY token file that a feature branch or white-label tenant
+ * is permitted to edit. Place all brand-specific overrides, custom color ramps,
+ * and accessibility adjustments here.
+ */
+
+:root,
+[data-theme='light'] {
+  /*
+   * A11y override: Bump --text-tertiary from neutral-500 (#6b7280) to neutral-600 (#4b5563)
+   * to guarantee WCAG 2.1 AA contrast ratio (>= 4.5:1) against neutral-0/neutral-50 light backgrounds.
+   */
+  --text-tertiary: var(--colors-neutral-600);
+
+  /* M42 Brand Tokens */
+  --app-bg: #f8fafc;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f1f5f9;
+  --app-primary: #0d212c;
+  --app-primary-soft: #d9e6eb;
+  --app-accent: #36c0c9;
+  --app-accent-hover: #2baab3;
+  --app-accent-soft: #ddf7f9;
+  --app-text: #0d212c;
+  --app-text-muted: #64748b;
+  --app-border: #e2e8f0;
+
+  /* Primary Light Action Button Tokens */
+  --action-primary-bg-default: #36c0c9;
+  --action-primary-bg-hover: #2fb0b9;
+  --action-primary-bg-pressed: #26969e;
+  --action-primary-text: #ffffff;
+}
+
+[data-theme='dark'] {
+  /*
+   * A11y override: Bump --text-tertiary from neutral-400 (#9ca3af) to neutral-300 (#d1d5db)
+   * to guarantee WCAG 2.1 AA contrast ratio (>= 4.5:1) against dark surface backgrounds.
+   */
+  --text-tertiary: var(--colors-neutral-300);
+
+  /* M42 Brand Tokens (Dark) */
+  --app-bg: #0a1820;
+  --app-surface: #0d212c;
+  --app-surface-muted: #153443;
+  --app-primary: #ffffff;
+  --app-primary-soft: #1a4256;
+  --app-accent: #36c0c9;
+  --app-accent-hover: #2baab3;
+  --app-accent-soft: #153443;
+  --app-text: #ffffff;
+  --app-text-muted: #94a3b8;
+  --app-border: #1e4558;
+
+  /* Primary Light Action Button Tokens */
+  --action-primary-bg-default: #36c0c9;
+  --action-primary-bg-hover: #2fb0b9;
+  --action-primary-bg-pressed: #26969e;
+  --action-primary-text: #ffffff;
+}

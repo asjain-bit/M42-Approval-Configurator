@@ -1,0 +1,74 @@
+/* DO NOT EDIT. Update by re-converting the designer's source file. */
+
+:root,
+[data-theme='light'] {
+  /* Backgrounds */
+  --bg-default: var(--colors-neutral-0);
+  --bg-surface-1: var(--colors-neutral-50);
+  --bg-surface-2: var(--colors-neutral-100);
+  --bg-surface-3: var(--colors-neutral-200);
+  --bg-surface-4: var(--colors-neutral-300);
+  --bg-surface-5: var(--colors-neutral-400);
+  --bg-overlay: rgba(17, 24, 39, 0.5);
+  --bg-input: var(--colors-neutral-0);
+  --bg-tooltip: var(--colors-neutral-900);
+  --bg-modal: var(--colors-neutral-0);
+  --bg-sidebar: var(--colors-neutral-50);
+  --bg-hover: var(--colors-neutral-100);
+  --bg-pressed: var(--colors-neutral-200);
+  --bg-selected: var(--colors-blue-50);
+  --bg-disabled: var(--colors-neutral-100);
+
+  /* Text */
+  --text-primary: var(--colors-neutral-900);
+  --text-secondary: var(--colors-neutral-600);
+  --text-tertiary: var(--colors-neutral-500);
+  --text-disabled: var(--colors-neutral-400);
+  --text-placeholder: var(--colors-neutral-400);
+  --text-inverse: var(--colors-neutral-0);
+  --text-on-primary: var(--colors-neutral-0);
+  --text-accent: var(--colors-blue-600);
+  --text-link: var(--colors-blue-600);
+  --text-success: var(--colors-green-700);
+  --text-warning: var(--colors-amber-800);
+  --text-error: var(--colors-red-700);
+  --text-info: var(--colors-sky-700);
+
+  /* Borders */
+  --border-default: var(--colors-neutral-200);
+  --border-subtle: var(--colors-neutral-100);
+  --border-strong: var(--colors-neutral-400);
+  --border-focus: var(--colors-blue-500);
+
+  /* Actions */
+  --action-primary-bg-default: var(--colors-blue-500);
+  --action-primary-bg-hover: var(--colors-blue-600);
+  --action-primary-bg-pressed: var(--colors-blue-700);
+  --action-primary-text: var(--colors-neutral-0);
+  --action-primary-bg-soft: var(--colors-blue-50);
+
+  --action-destructive-bg-default: var(--colors-red-600);
+  --action-destructive-bg-hover: var(--colors-red-700);
+  --action-destructive-text: var(--colors-neutral-0);
+
+  /* Status */
+  --status-success-bg: var(--colors-green-50);
+  --status-success-text: var(--colors-green-700);
+  --status-success-border: var(--colors-green-200);
+  --status-success-icon: var(--colors-green-600);
+
+  --status-warning-bg: var(--colors-amber-50);
+  --status-warning-text: var(--colors-amber-800);
+  --status-warning-border: var(--colors-amber-200);
+  --status-warning-icon: var(--colors-amber-600);
+
+  --status-error-bg: var(--colors-red-50);
+  --status-error-text: var(--colors-red-700);
+  --status-error-border: var(--colors-red-200);
+  --status-error-icon: var(--colors-red-600);
+
+  --status-info-bg: var(--colors-sky-50);
+  --status-info-text: var(--colors-sky-700);
+  --status-info-border: var(--colors-sky-200);
+  --status-info-icon: var(--colors-sky-600);
+}
