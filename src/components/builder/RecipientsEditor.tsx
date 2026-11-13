@@ -15,12 +15,17 @@ const KIND_LABELS: Record<RecipientKind, string> = {
   stepAssignees: "This step's assignees",
 }
 
-const ALL_KINDS: RecipientKind[] = ['role', 'team', 'user', 'vendor', 'fromCaseField', 'stepAssignees']
+const PICK_KINDS: RecipientKind[] = ['role', 'team', 'user', 'vendor']
+
+/** Roles that can be chosen when picking people */
+const APP_ROLES = ROLES.filter((r) => r.id === 'role-service-line-owner')
+const CASE_ROLES = ROLES.filter((r) => r.id === 'role-sponsor' || r.id === 'role-internal-interest')
+const PICKABLE_ROLES = [...APP_ROLES, ...CASE_ROLES]
 
 function defaultFor(kind: RecipientKind, caseFields: CaseField[]): Recipient {
   switch (kind) {
     case 'role':
-      return { kind, roleId: ROLES[0].id }
+      return { kind, roleId: PICKABLE_ROLES[0].id }
     case 'team':
       return { kind, teamId: TEAMS[0].id }
     case 'user':
@@ -31,9 +36,6 @@ function defaultFor(kind: RecipientKind, caseFields: CaseField[]): Recipient {
       return { kind } as Recipient
   }
 }
-
-/** The vendor's contacts an email can go to */
-export const VENDOR_CONTACTS = ['Primary contact', 'Person who submitted the form', 'Commercial contact', 'Technical contact']
 
 /** Dropdown with a checkbox per option; shows the chosen ones as a short summary */
 const MultiSelect: React.FC<{ label: string; options: { id: string; name: string }[]; value: string[]; allText: string; onChange: (v: string[]) => void }> = ({
@@ -94,8 +96,6 @@ interface Props {
   caseFields: CaseField[]
   id?: string
   invalid?: boolean
-  /** Reminders: no step assignees or case people, roles grouped by level, vendor needs no extra choice */
-  reminder?: boolean
 }
 
 /**
@@ -103,9 +103,9 @@ interface Props {
  * People picker for roles, teams, people, vendor or people stored on the case.
  * Used in: NodeForm, SlaBlock, WorkflowSettingsModal
  */
-export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds: kindsIn = ALL_KINDS, caseFields, id, invalid, reminder }) => {
-  const kinds = reminder ? kindsIn.filter((k) => k !== 'stepAssignees' && k !== 'fromCaseField') : kindsIn
-  const pickPeople = reminder || kinds.includes('vendor')
+export const RecipientsEditor: React.FC<Props> = ({ value, onChange, caseFields, id, invalid }) => {
+  // Everywhere people are chosen, the same four options are offered
+  const kinds = PICK_KINDS
   const peopleFields = caseFields.filter((f) => ['people', 'person', 'list'].includes(f.type))
   const update = (i: number, r: Recipient) => onChange(value.map((v, idx) => (idx === i ? r : v)))
 
@@ -129,32 +129,23 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds: kind
           {r.kind === 'role' && (
             <div className="min-w-0 flex-1 flex flex-col gap-1.5">
               <select aria-label="Role" className={inputSmall} value={r.roleId} onChange={(e) => update(i, { kind: 'role', roleId: e.target.value })}>
-                {reminder ? (
-                  <>
-                    <optgroup label="Application level role">
-                      {ROLES.filter((x) => !x.perCase).map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Case level role">
-                      {ROLES.filter((x) => x.perCase).map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </>
-                ) : (
-                  ROLES.map((x) => (
+                {!PICKABLE_ROLES.some((x) => x.id === r.roleId) && <option value={r.roleId}>Choose a role…</option>}
+                <optgroup label="Application level role">
+                  {APP_ROLES.map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}
                     </option>
-                  ))
-                )}
+                  ))}
+                </optgroup>
+                <optgroup label="Case level role">
+                  {CASE_ROLES.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
-              {pickPeople && !ROLES.find((x) => x.id === r.roleId)?.perCase && (
+              {!ROLES.find((x) => x.id === r.roleId)?.perCase && (
                 <MultiSelect
                   label="People in this role"
                   allText="Everyone in this role"
@@ -174,7 +165,7 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds: kind
                   </option>
                 ))}
               </select>
-              {pickPeople && (
+              {(
                 <MultiSelect
                   label="People in this team"
                   allText="Everyone in this team"
@@ -184,15 +175,6 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds: kind
                 />
               )}
             </div>
-          )}
-          {r.kind === 'vendor' && !reminder && (
-            <MultiSelect
-              label="Vendor contacts"
-              allText="All vendor contacts"
-              options={VENDOR_CONTACTS.map((c) => ({ id: c, name: c }))}
-              value={r.contacts ?? []}
-              onChange={(contacts) => update(i, { kind: 'vendor', contacts })}
-            />
           )}
           {r.kind === 'user' && (
             <select aria-label="Person" className={`${inputSmall} min-w-0 flex-1`} value={r.userId} onChange={(e) => update(i, { kind: 'user', userId: e.target.value })}>
@@ -221,7 +203,7 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds: kind
               ))}
             </select>
           )}
-          {(r.kind === 'stepAssignees' || (r.kind === 'vendor' && reminder)) && <div className="flex-1" />}
+          {(r.kind === 'stepAssignees' || r.kind === 'vendor') && <div className="flex-1" />}
           <button
             type="button"
             aria-label="Remove"

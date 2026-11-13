@@ -5,7 +5,7 @@
  */
 
 import { newId } from '@/lib/id'
-import type { AuditEntry, BreachAction, Reminder, SlaConfig, Stage, Workflow, WorkflowNode, WorkflowVersion } from '@/types/workflow'
+import type { AuditEntry, BreachAction, Recipient, Reminder, SlaConfig, Stage, Workflow, WorkflowNode, WorkflowVersion } from '@/types/workflow'
 import { getNodeType } from '@/lib/registry/nodes'
 import { createNode, newStage, normalizeStage, syncOutcomes } from '@/lib/workflow/graph'
 import { stepPrompt } from '@/lib/library'
@@ -48,8 +48,14 @@ const sla = (days: number | null, reminders: Reminder[] = [], breachIn: BreachAc
 }
 
 /** Reminders go to the step's role or team by name (reminders don't offer "this step's assignees") */
-const remindAssignee = (sla: SlaConfig, assignee: string): SlaConfig => {
-  const who = assignee.startsWith('role-') ? { kind: 'role' as const, roleId: assignee } : assignee.startsWith('team-') ? { kind: 'team' as const, teamId: assignee } : null
+const remindAssignee = (sla: SlaConfig, assignee: string, person?: string): SlaConfig => {
+  const who: Recipient | null = person
+    ? { kind: 'user', userId: person }
+    : assignee.startsWith('role-')
+      ? { kind: 'role', roleId: assignee }
+      : assignee.startsWith('team-')
+        ? { kind: 'team', teamId: assignee }
+        : null
   return { ...sla, reminders: sla.reminders.map((r) => ({ ...r, recipients: who ? [who] : r.recipients })) }
 }
 
@@ -65,7 +71,7 @@ function buildStage(name: string, description: string, specs: Spec[], positions?
       name: s.name,
       description: s.description ?? '',
       config: { ...base.config, ...(s.config ?? {}) },
-      ...(s.sla ? { sla: remindAssignee(s.sla, String(s.config?.assignee ?? '')) } : {}),
+      ...(s.sla ? { sla: remindAssignee(s.sla, String(s.config?.assignee ?? ''), s.config?.assigneeUser as string | undefined) } : {}),
       ...(s.toConfirm ? { toConfirm: s.toConfirm } : {}),
     })
     stage.nodes[node.id] = node
@@ -161,7 +167,7 @@ function stage1(): Stage {
           { id: newId('opt'), label: 'Reject', ask: 'Reason for rejection' },
         ],
       },
-      sla: sla(2, [reminder(1)], { kind: 'escalate', to: [{ kind: 'role', roleId: DIRECTOR }] }),
+      sla: sla(2, [reminder(1)], { kind: 'escalate', to: [{ kind: 'user', userId: 'u13' }] }),
       to: { Approve: 'type', Reject: 'rejectedAdmin' },
     },
     {
@@ -200,7 +206,7 @@ function stage1(): Stage {
           { id: newId('opt'), label: 'Request more info', ask: 'What the vendor needs to provide' },
         ],
       },
-      sla: sla(6, [reminder(5)], { kind: 'escalate', to: [{ kind: 'role', roleId: 'role-superadmin' }] }),
+      sla: sla(6, [reminder(5)], { kind: 'escalate', to: [{ kind: 'user', userId: 'u14' }] }),
       to: { Proceed: 'next', Reject: 'rejectedDirector', 'Request more info': 'waiting' },
     },
     {
@@ -235,7 +241,7 @@ export function internalCanvasStage(): Stage {
     fn: 'countWhere' as const,
     where: { left: { kind: 'caseField' as const, key: 'response' }, operator: 'is' as const, value: SPONSOR },
   })
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'role' as const, roleId: 'role-superadmin' }] }
+  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
 
   return buildStage(
     'Internal Canvas',
@@ -436,7 +442,7 @@ export function internalCanvasStage(): Stage {
  * writes the pre-read, and the team proceeds or rejects.
  */
 function strategicAlignmentStage(): Stage {
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'role' as const, roleId: 'role-superadmin' }] }
+  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
   return buildStage('Strategic Alignment', 'The strategy team reads the AI pre-read and decides whether the request goes ahead.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'send' } },
     {
@@ -502,7 +508,7 @@ function strategicAlignmentStage(): Stage {
  * Stage 4 – NDA: the director confirms the vendor signed the NDA and uploads it, then an agent builds the alignment pack.
  */
 function ndaStage(): Stage {
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'role' as const, roleId: 'role-superadmin' }] }
+  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
   return buildStage('NDA', 'The director uploads the signed NDA, then the agent builds the alignment pack.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'upload' } },
     {
@@ -548,7 +554,7 @@ function ndaStage(): Stage {
  * the agent summarises it, and the director proceeds or rejects.
  */
 function discoveryCallStage(): Stage {
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'role' as const, roleId: 'role-superadmin' }] }
+  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
   return buildStage('Discovery Call', 'The director confirms the discovery call, the agent summarises it, and the director decides.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'confirm' } },
     {
@@ -616,7 +622,7 @@ function discoveryCallStage(): Stage {
  */
 function valueStage(): Stage {
   const SPONSOR_ROLE = 'role-sponsor'
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'role' as const, roleId: DIRECTOR }] }
+  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u13' }] }
   return buildStage('Value & Due Diligence', 'The sponsor builds the business case, the TDD admin completes the assessments, and the sponsor makes the final call.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'business' } },
     {

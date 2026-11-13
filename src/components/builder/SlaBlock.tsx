@@ -162,7 +162,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                   <p className="text-[11px] text-[#64748b]">Sent by email.</p>
                   <div>
                     <span className={labelBase}>Send to</span>
-                    <RecipientsEditor reminder value={r.recipients} onChange={(recipients) => setReminder(i, { recipients })} caseFields={caseFields} />
+                    <RecipientsEditor value={r.recipients} onChange={(recipients) => setReminder(i, { recipients })} caseFields={caseFields} />
                   </div>
                   <div>
                     <label className={labelBase}>Email template</label>

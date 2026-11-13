@@ -116,7 +116,7 @@ export const NameDescriptionModal: React.FC<Props> = ({
         </div>
         <div>
           <label className={labelBase} htmlFor="nd-desc">
-            {descriptionLabel} <span className="text-[#94a3b8] font-normal">(optional)</span>
+            {descriptionLabel}
           </label>
           <textarea
             id="nd-desc"

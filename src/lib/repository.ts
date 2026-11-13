@@ -32,7 +32,7 @@ interface Store {
 }
 
 // v9: all six stages rebuilt
-const STORAGE_KEY = 'm42-workflow-configurator.v15'
+const STORAGE_KEY = 'm42-workflow-configurator.v16'
 
 let memory: Store | null = null
 
@@ -83,8 +83,6 @@ function migrateNode(node: WorkflowNode, firstStage: boolean) {
       break
     case 'closeRequest':
       c.reasonMode ??= 'optional'
-      // "Not asked" is gone: a reason is either mandatory or optional
-      if (c.reasonMode === 'none') c.reasonMode = 'optional'
       if (c.reasonSource === 'predefined') c.reasonSource = 'fixed'
       if (c.reasonSource === 'dynamic') c.reasonSource = 'step'
       if (c.statusLabel === undefined)

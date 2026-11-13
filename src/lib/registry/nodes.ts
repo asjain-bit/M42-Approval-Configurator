@@ -344,7 +344,7 @@ const stageComplete: NodeTypeDef = {
         },
         {
           key: 'condition',
-          label: 'Completion condition (optional)',
+          label: 'Completion condition',
           kind: 'text',
           maxLength: 120,
           placeholder: 'e.g. The director has confirmed the lead sponsor',
@@ -356,7 +356,7 @@ const stageComplete: NodeTypeDef = {
           kind: 'toggle',
           help: 'Turn on when the stage has been split into paths: it completes only after all of them reach this step.',
         },
-        { key: 'statusLabel', label: 'Status shown for this stage (optional)', kind: 'text', maxLength: 60 },
+        { key: 'statusLabel', label: 'Status shown for this stage', kind: 'text', maxLength: 60 },
         {
           key: '_note',
           label: '',
@@ -503,7 +503,7 @@ const stopWithLabel: NodeTypeDef = {
       fields: [
         { key: 'statusLabel', label: 'Status shown', kind: 'text', required: true, maxLength: 60, placeholder: 'e.g. Paused by the sponsor' },
         { key: 'note', label: 'Note', kind: 'textarea', maxLength: 300 },
-        { key: 'resumers', label: 'Who can resume it', kind: 'recipients', recipientKinds: ['role', 'team', 'user'] },
+        { key: 'resumers', label: 'Who can resume it', kind: 'recipients', recipientKinds: ['role', 'team', 'user', 'vendor'] },
       ],
     },
   ],
@@ -799,7 +799,7 @@ const step: NodeTypeDef = {
           key: 'recipients',
           label: 'Send to',
           kind: 'recipients',
-          recipientKinds: ['vendor', 'role', 'team', 'user'],
+          recipientKinds: ['role', 'team', 'user', 'vendor'],
           showIf: is('system', 'email', 'notify'),
         },
         { key: 'wait', label: 'Wait for', kind: 'duration', showIf: is('system', 'wait') },
@@ -1342,7 +1342,7 @@ const collectResponses: NodeTypeDef = {
           key: 'recipients',
           label: 'People, roles or teams',
           kind: 'recipients',
-          recipientKinds: ['role', 'team', 'user'],
+          recipientKinds: ['role', 'team', 'user', 'vendor'],
           showIf: (s) => s.recipientSource !== 'earlier',
         },
         {
