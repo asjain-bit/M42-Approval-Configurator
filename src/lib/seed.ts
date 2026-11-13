@@ -8,7 +8,7 @@ import { newId } from '@/lib/id'
 import type { AuditEntry, BreachAction, Reminder, SlaConfig, Stage, Workflow, WorkflowNode, WorkflowVersion } from '@/types/workflow'
 import { getNodeType } from '@/lib/registry/nodes'
 import { createNode, newStage, normalizeStage, syncOutcomes } from '@/lib/workflow/graph'
-import { findAgent } from '@/lib/library'
+import { stepPrompt } from '@/lib/library'
 
 type Spec = {
   ref: string
@@ -93,7 +93,7 @@ const rejectAndEmail = (statusLabel: string) => ({
 })
 
 function stage1(): Stage {
-  return buildStage('Initial Assessment Brief', 'Vendor submits the form, the intake agent checks it, then the Partnership Admin and Director review.', [
+  return buildStage('Initial Assessment Brief', 'Vendor submits the form, the triage agent checks it, then the Partnership Admin and Director review.', [
     {
       ref: 'start',
       type: 'stageStart',
@@ -118,13 +118,13 @@ function stage1(): Stage {
     {
       ref: 'agent',
       type: 'step',
-      name: 'Intake agent analysis',
+      name: 'Triage agent analysis',
       description: 'Runs the intake checks and writes the Initial Assessment Brief.',
       config: {
         actor: 'agent',
         action: 'check',
-        agentId: 'intake-agent',
-        prompt: findAgent('intake-agent')?.prompt ?? '',
+        agentId: 'triage-agent',
+        prompt: stepPrompt('intake-agent'),
         tasks: [],
         outcomes: options('All checks passed', 'Any check failed'),
       },
@@ -247,8 +247,8 @@ export function internalCanvasStage(): Stage {
         config: {
           actor: 'agent',
           action: 'analyse',
-          agentId: 'internal-interest-matcher',
-          prompt: findAgent('internal-interest-matcher')?.prompt ?? '',
+          agentId: 'triage-agent',
+          prompt: stepPrompt('internal-interest-matcher'),
           tasks: [],
           outcomes: options('People suggested'),
         },
@@ -457,8 +457,8 @@ function strategicAlignmentStage(): Stage {
       config: {
         actor: 'agent',
         action: 'generate',
-        agentId: 'pre-read-agent',
-        prompt: findAgent('pre-read-agent')?.prompt ?? '',
+        agentId: 'triage-agent',
+        prompt: stepPrompt('pre-read-agent'),
         tasks: [],
         outcomes: options('Pre-read ready'),
       },
@@ -481,7 +481,7 @@ function strategicAlignmentStage(): Stage {
           { id: newId('opt'), label: 'Reject', ask: 'Reason for rejection' },
         ],
       },
-      sla: sla(5, [reminder(3)], escalate),
+      sla: sla(4, [reminder(3)], escalate),
       to: { Proceed: 'complete', Reject: 'rejected' },
     },
     { ref: 'rejected', type: 'closeRequest', name: 'Rejected by strategy team', config: rejectAndEmail('Rejected – by strategy team') },
@@ -523,8 +523,8 @@ function ndaStage(): Stage {
       config: {
         actor: 'agent',
         action: 'generate',
-        agentId: 'alignment-pack-agent',
-        prompt: findAgent('alignment-pack-agent')?.prompt ?? '',
+        agentId: 'triage-agent',
+        prompt: stepPrompt('alignment-pack-agent'),
         tasks: [],
         outcomes: options('Alignment pack ready'),
       },
@@ -569,8 +569,8 @@ function discoveryCallStage(): Stage {
       config: {
         actor: 'agent',
         action: 'generate',
-        agentId: 'call-summary-agent',
-        prompt: findAgent('call-summary-agent')?.prompt ?? '',
+        agentId: 'triage-agent',
+        prompt: stepPrompt('call-summary-agent'),
         tasks: [],
         outcomes: options('Summary ready'),
       },
@@ -636,8 +636,8 @@ function valueStage(): Stage {
       config: {
         actor: 'agent',
         action: 'generate',
-        agentId: 'value-summary-agent',
-        prompt: findAgent('value-summary-agent')?.prompt ?? '',
+        agentId: 'triage-agent',
+        prompt: stepPrompt('value-summary-agent'),
         tasks: [],
         outcomes: options('Summary ready'),
       },
@@ -676,7 +676,7 @@ function valueStage(): Stage {
         instructions: 'Mark every technical due diligence assessment as complete.',
         outcomes: options('All assessments completed'),
       },
-      sla: sla(15, [reminder(10)], escalate),
+      sla: sla(10, [reminder(7)], escalate),
       to: { 'All assessments completed': 'report' },
     },
     {
@@ -686,8 +686,8 @@ function valueStage(): Stage {
       config: {
         actor: 'agent',
         action: 'generate',
-        agentId: 'tdd-report-agent',
-        prompt: findAgent('tdd-report-agent')?.prompt ?? '',
+        agentId: 'tdd-agent',
+        prompt: stepPrompt('tdd-report-agent'),
         tasks: [],
         outcomes: options('Report ready'),
       },
@@ -801,7 +801,7 @@ export function seedHistory(wf: Workflow): { workflow: Workflow; audit: AuditEnt
       versions.push({ id: newId('ver'), version, at: audit[audit.length - 1].at, by: DIRECTOR_USER, summary, snapshot: snapshot(index + 1, version) })
     }
   })
-  log({ level: 'node', action: 'edited', stageId: wf.stageIds[0], objectPath: `${wf.stages[wf.stageIds[0]].name} › Intake agent analysis › Prompt`, before: 'Previous prompt', after: 'Added the strategic alignment check' }, ADMIN_USER, 90)
+  log({ level: 'node', action: 'edited', stageId: wf.stageIds[0], objectPath: `${wf.stages[wf.stageIds[0]].name} › Triage agent analysis › Prompt`, before: 'Previous prompt', after: 'Added the strategic alignment check' }, ADMIN_USER, 90)
 
   return {
     workflow: { ...wf, version: 3, publishedVersion: 2, status: 'draft', updatedAt: audit[audit.length - 1].at, updatedBy: ADMIN_USER },

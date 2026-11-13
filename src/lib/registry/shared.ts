@@ -184,3 +184,47 @@ export const eventNotificationsSection: SectionSchema = {
     },
   ],
 }
+
+/** Extra things an admin can add to any step from "Add to this step" */
+export const customActionsSection: SectionSchema = {
+  id: 'customActions',
+  title: 'Custom actions',
+  fields: [
+    {
+      key: 'customActions',
+      label: 'Actions that run with this step',
+      kind: 'list',
+      addLabel: 'Add custom action',
+      itemTitle: (item, i) => asString(item.name) || `Action ${i + 1}`,
+      newItem: () => ({ id: newId('act'), name: '', runs: 'stepStarts', action: 'email', details: '' }),
+      itemSchema: [
+        { key: 'name', label: 'Action name', kind: 'text', required: true, placeholder: 'e.g. Tell finance' },
+        {
+          key: 'runs',
+          label: 'When',
+          kind: 'select',
+          options: opt([
+            ['stepStarts', 'The step starts'],
+            ['stepEnds', 'The step is done'],
+            ['overdue', 'The step is overdue'],
+          ]),
+        },
+        {
+          key: 'action',
+          label: 'What happens',
+          kind: 'select',
+          allowCustom: true,
+          options: opt([
+            ['email', 'Send an email'],
+            ['notify', 'Notify a person'],
+            ['updateField', 'Update a case field'],
+            ['agent', 'Ask an agent to do something'],
+            ['external', 'Call an external system'],
+            ['document', 'Save a document'],
+          ]),
+        },
+        { key: 'details', label: 'Details', kind: 'textarea', rows: 3, placeholder: 'Describe what this action should do' },
+      ],
+    },
+  ],
+}

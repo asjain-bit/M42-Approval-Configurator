@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, CircleHelp, Copy, Lock, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleHelp, Copy, Lock, Plus, Trash2, X } from 'lucide-react'
 import { categoryOf, getNodeType, nodeView, slaKind } from '@/lib/registry/nodes'
-import { customText, eventNotificationsSection, isCustom } from '@/lib/registry/shared'
+import { asArray, customActionsSection, customText, eventNotificationsSection, humanSla, isCustom } from '@/lib/registry/shared'
 import type { SchemaContext, SectionSchema } from '@/lib/registry/types'
 import type { SlaConfig, WorkflowNode } from '@/types/workflow'
 import { btnIcon, inputSmall, labelBase, textareaBase } from '@/components/ui/styles'
@@ -40,23 +40,36 @@ const describeValue = (v: unknown): string | undefined => {
   return undefined
 }
 
-const Section: React.FC<{ id: string; title: string; open: boolean; onToggle: () => void; children: React.ReactNode }> = ({
+const Section: React.FC<{ id: string; title: string; open: boolean; onToggle: () => void; onRemove?: () => void; children: React.ReactNode }> = ({
   id,
   title,
   open,
   onToggle,
+  onRemove,
   children,
 }) => (
-  <section className="border-b border-[#f1f5f9]" aria-labelledby={`sec-${id}`}>
-    <button
-      id={`sec-${id}`}
-      className="w-full flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-[#0d212c] cursor-pointer hover:bg-slate-50"
-      aria-expanded={open}
-      onClick={onToggle}
-    >
-      {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-      {title}
-    </button>
+  <section className="border-b border-[#f1f5f9] group/sec" aria-labelledby={`sec-${id}`}>
+    <div className="flex items-center hover:bg-slate-50">
+      <button
+        id={`sec-${id}`}
+        className="flex-1 flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-[#0d212c] cursor-pointer"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        {title}
+      </button>
+      {onRemove && (
+        <button
+          className="mr-3 p-1 rounded-md text-[#94a3b8] opacity-0 group-hover/sec:opacity-100 focus:opacity-100 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+          aria-label={`Remove ${title} from this step`}
+          title={`Remove “${title}” from this step`}
+          onClick={onRemove}
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
     {open && <div className="px-4 pb-4 flex flex-col gap-3.5">{children}</div>}
   </section>
 )
@@ -121,6 +134,47 @@ export const NodeForm: React.FC<Props> = ({
   }
 
   const toggle = (id: string) => setClosed((c) => ({ ...c, [id]: !c[id] }))
+
+  // Sections the admin removed from this step, and extras they added to it
+  const hidden = asArray<string>(node.config.hiddenSections)
+  const added = asArray<string>(node.config.addedFeatures)
+  const shows = (id: string, builtIn: boolean) => (builtIn && !hidden.includes(id)) || added.includes(id)
+  const titleOf = (id: string) =>
+    ({ sla: 'Deadline and reminders', notifications: 'Email notifications', customActions: 'Custom actions' })[id] ??
+    sections.find((x) => x.id === id)?.title ??
+    id
+  const removeSection = (id: string) =>
+    onChange(
+      {
+        ...node,
+        config: {
+          ...node.config,
+          hiddenSections: hidden.includes(id) ? hidden : [...hidden, id],
+          addedFeatures: added.filter((a) => a !== id),
+        },
+        ...(id === 'sla' && node.sla ? { sla: { ...node.sla, enabled: false } } : {}),
+      },
+      { what: `Removed “${titleOf(id)}”` }
+    )
+  const addSection = (id: string) => {
+    const next: WorkflowNode = {
+      ...node,
+      config: { ...node.config, hiddenSections: hidden.filter((h) => h !== id), addedFeatures: added.includes(id) ? added : [...added, id] },
+    }
+    if (id === 'sla' && !node.sla) next.sla = def.defaultSla?.() ?? humanSla()
+    if (id === 'sla' && next.sla && !next.sla.enabled) next.sla = { ...next.sla, enabled: true }
+    onChange(next, { what: `Added “${titleOf(id)}”` })
+    setClosed((c) => ({ ...c, [id]: false }))
+    setAddOpen(false)
+  }
+  const [addOpen, setAddOpen] = useState(false)
+  const builtInSla = !!sla
+  const addable = [
+    ...sections.filter((x) => hidden.includes(x.id) && (!x.showIf || x.showIf(node.config, ctx))).map((x) => x.id),
+    ...(!shows('sla', builtInSla) ? ['sla'] : []),
+    ...(!shows('notifications', !!def.eventNotifications) ? ['notifications'] : []),
+    ...(!shows('customActions', false) ? ['customActions'] : []),
+  ]
 
   return (
     <RoutingContext.Provider value={routing}>
@@ -201,8 +255,8 @@ export const NodeForm: React.FC<Props> = ({
           </Section>
 
           {sections.map((section) =>
-            section.showIf && !section.showIf(node.config, ctx) ? null : (
-              <Section key={section.id} id={section.id} title={section.title} open={!closed[section.id]} onToggle={() => toggle(section.id)}>
+            (section.showIf && !section.showIf(node.config, ctx)) || hidden.includes(section.id) ? null : (
+              <Section key={section.id} id={section.id} title={section.title} open={!closed[section.id]} onToggle={() => toggle(section.id)} onRemove={() => removeSection(section.id)}>
                 {section.fields.map((f) => (
                   <FieldRenderer
                     key={f.key}
@@ -248,8 +302,8 @@ export const NodeForm: React.FC<Props> = ({
             </Section>
           )}
 
-          {sla && (
-            <Section id="sla" title={sla === 'agent' ? 'Time limit for the agent' : 'Deadline and reminders'} open={!closed.sla} onToggle={() => toggle('sla')}>
+          {shows('sla', builtInSla) ? (
+            <Section id="sla" title={sla === 'agent' ? 'Time limit for the agent' : 'Deadline and reminders'} open={!closed.sla} onToggle={() => toggle('sla')} onRemove={() => removeSection('sla')}>
               <div id="field-sla" className="rounded-lg">
                 <SlaBlock
                   node={node}
@@ -263,9 +317,9 @@ export const NodeForm: React.FC<Props> = ({
                 />
               </div>
             </Section>
-          )}
-          {def.eventNotifications && (
-            <Section id="notifications" title={eventNotificationsSection.title} open={!closed.notifications} onToggle={() => toggle('notifications')}>
+          ) : null}
+          {shows('notifications', !!def.eventNotifications) && (
+            <Section id="notifications" title={eventNotificationsSection.title} open={!closed.notifications} onToggle={() => toggle('notifications')} onRemove={() => removeSection('notifications')}>
               {eventNotificationsSection.fields.map((f) => (
                 <FieldRenderer
                   key={f.key}
@@ -278,6 +332,57 @@ export const NodeForm: React.FC<Props> = ({
                 />
               ))}
             </Section>
+          )}
+          {shows('customActions', false) && (
+            <Section id="customActions" title={customActionsSection.title} open={!closed.customActions} onToggle={() => toggle('customActions')} onRemove={() => removeSection('customActions')}>
+              {customActionsSection.fields.map((f) => (
+                <FieldRenderer
+                  key={f.key}
+                  field={f}
+                  scope={node.config}
+                  ctx={ctx}
+                  anchor="config"
+                  highlighted={focusField === `config:${f.key}`}
+                  onChange={(path, v) => setConfig(path, v, f.label)}
+                />
+              ))}
+            </Section>
+          )}
+
+          {/* Add more to this step */}
+          {addable.length > 0 && (
+            <div className="p-4">
+              <button
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#cbd5e1] py-2.5 text-xs font-semibold text-[#0f8a93] hover:bg-[#f0fbfc] hover:border-[#36c0c9] cursor-pointer"
+                aria-expanded={addOpen}
+                onClick={() => setAddOpen((o) => !o)}
+              >
+                <Plus className="w-3.5 h-3.5" /> Add to this step
+              </button>
+              {addOpen && (
+                <ul className="mt-2 rounded-xl border border-[#e2e8f0] bg-white shadow-sm overflow-hidden">
+                  {addable.map((id) => (
+                    <li key={id}>
+                      <button
+                        className="w-full text-left px-3 py-2.5 text-xs text-[#0d212c] hover:bg-slate-50 cursor-pointer flex flex-col"
+                        onClick={() => addSection(id)}
+                      >
+                        <span className="font-medium">{titleOf(id)}</span>
+                        <span className="text-[11px] text-[#64748b]">
+                          {
+                            ({
+                              sla: 'Set a deadline, reminders and what happens if it is missed.',
+                              notifications: 'Email people when the step starts, a decision is made or it is overdue.',
+                              customActions: 'Add your own action, like sending an email or updating a field.',
+                            } as Record<string, string>)[id] ?? 'Put this back on the step.'
+                          }
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       </div>

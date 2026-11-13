@@ -56,8 +56,8 @@ const StageCard: React.FC<{ index: number; status: 'done' | 'active' | 'pending'
       <rect width={CARD.w} height={CARD.h} rx="12" fill="#ffffff" stroke={status === 'active' ? '#36c0c9' : '#e2e8f0'} strokeWidth={status === 'active' ? 1.5 : 1} />
       <rect x="12" y="11" width="16" height="16" rx="5" fill={status === 'pending' ? '#f1f5f9' : '#ddf7f9'} />
       <rect x="16.5" y="15.5" width="7" height="7" rx="1.5" stroke={status === 'pending' ? '#cbd5e1' : '#36c0c9'} strokeWidth="1.4" />
-      <rect x="34" y="13" width={[44, 36, 40, 30, 42][index]} height="5" rx="2.5" fill={status === 'pending' ? '#e2e8f0' : '#7fd6dc'} />
-      <rect x="34" y="22" width={[28, 34, 24, 32, 26][index]} height="4" rx="2" fill="#eef2f6" />
+      <rect x="34" y="13" width={[44, 36, 40, 30, 42][index]} height="5" rx="2.5" fill={status === 'active' ? 'url(#lg-shimmer)' : status === 'pending' ? '#e2e8f0' : '#7fd6dc'} />
+      <rect x="34" y="22" width={[28, 34, 24, 32, 26][index]} height="4" rx="2" fill={status === 'active' ? 'url(#lg-shimmer)' : '#eef2f6'} />
       {/* Status */}
       <g transform="translate(12 42)">
         {status === 'done' && (
@@ -69,9 +69,8 @@ const StageCard: React.FC<{ index: number; status: 'done' | 'active' | 'pending'
         )}
         {status === 'active' && (
           <>
-            <circle cx="6" cy="6" r="5" stroke="#cfe9ec" strokeWidth="2" fill="none" />
-            <circle cx="6" cy="6" r="5" stroke="#36c0c9" strokeWidth="2" strokeLinecap="round" strokeDasharray="9 23" fill="none" className="login-spinner" />
-            <rect x="16" y="4" width="34" height="4" rx="2" fill="#cfe9ec" />
+            <circle cx="6" cy="6" r="6" fill="url(#lg-shimmer)" />
+            <rect x="16" y="4" width="56" height="4" rx="2" fill="url(#lg-shimmer)" />
           </>
         )}
         {status === 'pending' && (
@@ -85,50 +84,59 @@ const StageCard: React.FC<{ index: number; status: 'done' | 'active' | 'pending'
   )
 }
 
-/** Decorative workflow: an AI agent moves a request through each stage in turn, marking each one complete */
+/** Decorative workflow: the workflow builder processes each connected stage card in turn, marking each one complete */
 const FlowIllustration: React.FC = () => {
   const step = usePipelineStep()
-  const path = SPOTS.map((_, i) => centre(i))
-    .map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`)
-    .join(' ')
-  const at = centre(Math.min(step, PIPELINE.length - 1))
-  const done = Math.min(step, PIPELINE.length - 1)
 
   return (
     <svg viewBox="0 0 528 300" className="w-full max-w-[560px] h-auto select-none" aria-hidden="true" fill="none">
-      {/* Track, and the part already travelled */}
-      <path d={path} stroke="#d9eef1" strokeWidth="2" strokeDasharray="4 5" />
-      <path
-        d={SPOTS.slice(0, done + 1)
-          .map((_, i) => centre(i))
-          .map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`)
-          .join(' ')}
-        stroke="#36c0c9"
-        strokeWidth="2"
-        className="login-dash"
-      />
+      <defs>
+        {/* Loader shimmer: a soft highlight sweeping across the card being processed */}
+        <linearGradient id="lg-shimmer" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#e3f4f6" />
+          <stop offset="0.5" stopColor="#9fe0e5" />
+          <stop offset="1" stopColor="#e3f4f6" />
+          <animateTransform attributeName="gradientTransform" type="translate" values="-1 0; 1 0" dur="1.1s" repeatCount="indefinite" />
+        </linearGradient>
+      </defs>
 
-      {/* AI agent overseeing the run */}
+      {/* The workflow builder connects to every stage card */}
+      {SPOTS.map((_, i) => {
+        const c = centre(i)
+        const top = c.y - CARD.h / 2
+        const status = i < step ? 'done' : i === step ? 'active' : 'pending'
+        return (
+          <path
+            key={i}
+            d={`M264 76 C 264 ${76 + 26}, ${c.x} ${top - 26}, ${c.x} ${top}`}
+            stroke={status === 'pending' ? '#d9eef1' : '#36c0c9'}
+            strokeWidth={status === 'active' ? 2 : 1.5}
+            strokeLinecap="round"
+            style={{ transition: 'stroke 0.4s ease' }}
+          />
+        )
+      })}
+
+      {/* Workflow builder hub */}
       <g transform="translate(264 44)">
-        <circle r="30" fill="#ffffff" fillOpacity="0.55" stroke="#ffffff" />
-        <circle r="23" fill="#36c0c9" fillOpacity="0.22" stroke="#ffffff" strokeWidth="1.5" className="login-breathe" />
-        <circle r="30" stroke="#36c0c9" strokeWidth="1.5" strokeDasharray="9 13" strokeLinecap="round" className="login-spin" />
-        {/* Workflow builder: a start node branching to two steps */}
+        <circle r="32" fill="#ffffff" fillOpacity="0.6" stroke="#ffffff" />
+        <circle r="25" fill="#36c0c9" fillOpacity="0.18" stroke="#ffffff" strokeWidth="1.5" className="login-breathe" />
+        {/* A small flow: start node branching to two steps that merge into one; each part lights up in turn */}
         <g strokeLinecap="round" strokeLinejoin="round">
-          <path d="M-3 -6 v4 h-6 v4 M-3 -2 h6 v4" stroke="#0f8a93" strokeWidth="1.6" fill="none" />
-          <rect x="-8" y="-14" width="10" height="8" rx="2.5" fill="#0f8a93" />
-          <rect x="-13" y="2" width="9" height="8" rx="2.5" fill="#ffffff" stroke="#0f8a93" strokeWidth="1.6" />
-          <rect x="-1" y="2" width="9" height="8" rx="2.5" fill="#36c0c9" className="login-node-pulse" />
+          <path d="M0 -8 C 0 -3, -8 -4, -8 1" stroke="#0f8a93" strokeWidth="1.6" pathLength={1} className="login-edge login-edge-1" />
+          <path d="M0 -8 C 0 -3, 8 -4, 8 1" stroke="#0f8a93" strokeWidth="1.6" pathLength={1} className="login-edge login-edge-1" />
+          <path d="M-8 7 C -8 11, 0 10, 0 13" stroke="#0f8a93" strokeWidth="1.6" pathLength={1} className="login-edge login-edge-2" />
+          <path d="M8 7 C 8 11, 0 10, 0 13" stroke="#0f8a93" strokeWidth="1.6" pathLength={1} className="login-edge login-edge-2" />
+          <rect x="-5" y="-15" width="10" height="7" rx="2.5" fill="#0f8a93" />
+          <rect x="-12.5" y="1" width="9" height="6" rx="2" fill="#ffffff" stroke="#0f8a93" strokeWidth="1.4" className="login-node login-node-1" />
+          <rect x="3.5" y="1" width="9" height="6" rx="2" fill="#ffffff" stroke="#0f8a93" strokeWidth="1.4" className="login-node login-node-1" />
+          <circle cx="0" cy="16" r="3.5" fill="#ffffff" stroke="#0f8a93" strokeWidth="1.4" className="login-node login-node-2" />
         </g>
       </g>
-      <path d={`M264 74 L ${at.x} ${at.y - CARD.h / 2}`} stroke="#7fd6dc" strokeWidth="1.25" strokeDasharray="2 4" style={{ transition: 'd 0.6s ease' }} />
 
       {SPOTS.map((_, i) => (
         <StageCard key={i} index={i} status={i < step ? 'done' : i === step ? 'active' : 'pending'} />
       ))}
-
-      {/* The request travelling between stages */}
-      <circle r="5" fill="#0f8a93" stroke="#ffffff" strokeWidth="2" style={{ transform: `translate(${at.x}px, ${at.y + CARD.h / 2}px)`, transition: 'transform 0.6s cubic-bezier(.45,0,.55,1)' }} />
 
       {/* Reviewers */}
       <g transform="translate(176 232)">
@@ -192,10 +200,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         .login-twinkle-late { animation: login-twinkle 2.8s ease-in-out 1.4s infinite }
         @keyframes login-spinner { to { transform: rotate(360deg) } }
         .login-spinner { transform-box: fill-box; transform-origin: center; animation: login-spinner 0.9s linear infinite }
+        .login-edge { stroke-dasharray: 1; stroke-dashoffset: 1; animation: login-draw 2.8s ease-in-out infinite }
+        .login-edge-2 { animation-delay: .7s }
+        @keyframes login-draw { 0% { stroke-dashoffset: 1 } 25%,75% { stroke-dashoffset: 0 } 100% { stroke-dashoffset: 1 } }
+        .login-node { animation: login-light 2.8s ease-in-out infinite }
+        .login-node-1 { animation-delay: .35s }
+        .login-node-2 { animation-delay: 1.05s }
+        @keyframes login-light { 0%,100% { fill: #ffffff } 30%,65% { fill: #36c0c9 } }
         @keyframes login-pop { from { opacity: .6; transform: translateY(2px) } to { opacity: 1; transform: none } }
         .login-card > g { animation: login-pop .35s ease-out }
         @media (prefers-reduced-motion: reduce) {
-          .login-float, .login-float-slow, .login-dash, .login-spin, .login-breathe, .login-sparkle, .login-twinkle, .login-twinkle-late, .login-node-pulse { animation: none }
+          .login-float, .login-float-slow, .login-dash, .login-spin, .login-breathe, .login-sparkle, .login-twinkle, .login-twinkle-late, .login-node-pulse, .login-node { animation: none }
+          .login-edge { animation: none; stroke-dashoffset: 0 }
         }
       `}</style>
 

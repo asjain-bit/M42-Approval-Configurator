@@ -195,7 +195,8 @@ export const QUESTIONNAIRES: Questionnaire[] = [
   },
 ]
 
-export const AGENTS: AgentDefinition[] = [
+/** Step-specific prompts kept from the original per-step agents; seeded steps use these */
+const STEP_PROMPT_SOURCES: AgentDefinition[] = [
   {
     id: 'intake-agent',
     name: 'Intake agent',
@@ -299,6 +300,57 @@ export const AGENTS: AgentDefinition[] = [
     outputs: [],
   },
 ]
+
+const triageOutputs = STEP_PROMPT_SOURCES.filter((a) => a.id !== 'tdd-report-agent').flatMap((a) => a.outputs)
+
+export const AGENTS: AgentDefinition[] = [
+  {
+    id: 'inbox-agent',
+    name: 'Inbox agent',
+    description:
+      'Labels the email, extracts vendor and contact details, checks for an existing case, drafts the reply and sends questionnaire chasers (Stage 2).',
+    prompt:
+      'Read the incoming email. Label it, extract the vendor and contact details and check whether a case already exists for this vendor.\nDraft a reply for the team to review. In Stage 2, send reminders to people who have not yet answered the questionnaire.',
+    actions: [{ id: 'handle-email', name: 'Handle email', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [],
+  },
+  {
+    id: 'triage-agent',
+    name: 'Triage agent',
+    description:
+      'Checks questionnaire answers on submit (Stage 2), runs the checks and research in Stage 3, writes the brief and recommendation, runs the canvass and assembles packs.',
+    prompt: STEP_PROMPT_SOURCES[0].prompt,
+    actions: STEP_PROMPT_SOURCES[0].actions,
+    outputs: triageOutputs,
+  },
+  {
+    id: 'coe-intake-agent',
+    name: 'CoE intake agent (external)',
+    description: 'Supplies the Agentic CoE backlog through its API.',
+    prompt: 'Fetch the current Agentic CoE backlog through the API and return the items related to this request.',
+    actions: [{ id: 'fetch-backlog', name: 'Fetch CoE backlog', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [],
+  },
+  {
+    id: 'news-trends-agent',
+    name: 'News trends intelligence agent (external)',
+    description: 'Supplies the digital roadmap and strategy deck.',
+    prompt: 'Provide the latest digital roadmap and strategy deck relevant to this request.',
+    actions: [{ id: 'fetch-roadmap', name: 'Fetch roadmap and strategy deck', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [],
+  },
+  {
+    id: 'tdd-agent',
+    name: 'Tech Due Diligence agent',
+    description: 'Runs technical due diligence and delivers the TDD report.',
+    prompt: STEP_PROMPT_SOURCES.find((a) => a.id === 'tdd-report-agent')!.prompt,
+    actions: STEP_PROMPT_SOURCES.find((a) => a.id === 'tdd-report-agent')!.actions,
+    outputs: STEP_PROMPT_SOURCES.find((a) => a.id === 'tdd-report-agent')!.outputs,
+  },
+]
+
+/** The seeded prompt for a step that used one of the original per-step agents */
+export const stepPrompt = (id: string) => STEP_PROMPT_SOURCES.find((a) => a.id === id)?.prompt ?? ''
 
 export const ROLES: Role[] = [
   { id: 'role-partnership-admin', name: 'Partnership Admin', memberIds: ['u11', 'u12'] },

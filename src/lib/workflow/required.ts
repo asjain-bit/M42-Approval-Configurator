@@ -20,6 +20,7 @@ export function missingRequired(ctx: SchemaContext): string[] {
   if (!node.name.trim()) out.push('Name')
   for (const section of def.configSchema) {
     if (section.showIf && !section.showIf(node.config, ctx)) continue
+    if (Array.isArray(node.config.hiddenSections) && node.config.hiddenSections.includes(section.id)) continue
     for (const f of section.fields)
       if (f.required && visible(f, node.config, ctx) && isEmpty(getPath(node.config, f.key))) out.push(f.label || section.title)
   }

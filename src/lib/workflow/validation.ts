@@ -78,12 +78,14 @@ function nodeIssues(node: WorkflowNode, stage: Stage, workflow: Workflow, ctx: S
 
   for (const section of def.configSchema) {
     if (section.showIf && !section.showIf(node.config, ctx)) continue
+    if (Array.isArray(node.config.hiddenSections) && node.config.hiddenSections.includes(section.id)) continue
     for (const r of requiredFieldIssues(section.fields, node.config, ctx, ''))
       issues.push({ ...base, severity: 'error', field: r.field, message: `"${name}": ${r.message}` })
   }
 
   const kind = slaKind(def, node)
-  if (kind) {
+  const slaRemoved = Array.isArray(node.config.hiddenSections) && node.config.hiddenSections.includes('sla')
+  if (kind && !slaRemoved) {
     const sla = node.sla
     const what = kind === 'agent' ? 'run timeout' : 'time limit'
     if (!sla || !sla.enabled)
