@@ -5,7 +5,8 @@
  */
 
 import { newId } from '@/lib/id'
-import type { BreachAction, Reminder, SlaConfig, Stage, Workflow, WorkflowNode } from '@/types/workflow'
+import type { AuditEntry, BreachAction, Reminder, SlaConfig, Stage, Workflow, WorkflowNode, WorkflowVersion } from '@/types/workflow'
+import { getNodeType } from '@/lib/registry/nodes'
 import { createNode, newStage, normalizeStage, syncOutcomes } from '@/lib/workflow/graph'
 import { findAgent } from '@/lib/library'
 
@@ -739,5 +740,72 @@ export function seedWorkflow(): Workflow {
     },
     updatedAt: new Date().toISOString(),
     updatedBy: 'System seed',
+  }
+}
+
+/**
+ * Starting history for the sample workflow: how it was built, stage by stage, and two published versions
+ * (stages 1–2, then stages 1–4) that can be restored. The current draft is version 3.
+ */
+export function seedHistory(wf: Workflow): { workflow: Workflow; audit: AuditEntry[]; versions: WorkflowVersion[] } {
+  const ADMIN_USER = 'Nadia Al-Farsi'
+  const DIRECTOR_USER = 'Aisha Khan'
+  const start = new Date('2026-10-20T08:30:00Z').getTime()
+  let minutes = 0
+  const at = (gap = 7) => new Date(start + (minutes += gap) * 60_000).toISOString()
+  const audit: AuditEntry[] = []
+  const log = (e: Omit<AuditEntry, 'id' | 'at' | 'by'>, by = ADMIN_USER, gap?: number) => audit.push({ id: newId('aud'), at: at(gap), by, ...e })
+
+  const snapshot = (upTo: number, version: number): Workflow => {
+    const ids = wf.stageIds.slice(0, upTo)
+    return JSON.parse(
+      JSON.stringify({ ...wf, status: 'published', version, publishedVersion: version, stageIds: ids, stages: Object.fromEntries(ids.map((id) => [id, wf.stages[id]])) })
+    )
+  }
+  const versions: WorkflowVersion[] = []
+
+  log({ level: 'workflow', action: 'created', objectPath: wf.name, after: 'New workflow' })
+  wf.stageIds.forEach((stageId, index) => {
+    const stage = wf.stages[stageId]
+    // A new working day for each stage
+    minutes += 60 * 20
+    log({ level: 'stage', action: 'created', stageId, objectPath: `${wf.name} › ${stage.name}`, after: `Position ${index + 1}` })
+    for (const node of Object.values(stage.nodes))
+      log({ level: 'node', action: 'created', stageId, objectPath: `${stage.name} › ${node.name}`, after: getNodeType(node.type).label }, ADMIN_USER, 4)
+    for (const node of Object.values(stage.nodes))
+      for (const o of node.outcomes)
+        if (o.targetNodeId)
+          log(
+            { level: 'connection', action: 'connected', stageId, objectPath: `${stage.name} › ${node.name} › ${o.label}`, after: stage.nodes[o.targetNodeId]?.name },
+            ADMIN_USER,
+            2
+          )
+    for (const node of Object.values(stage.nodes))
+      if (node.sla?.enabled)
+        log(
+          {
+            level: 'node',
+            action: 'edited',
+            stageId,
+            objectPath: `${stage.name} › ${node.name} › Deadline`,
+            before: 'No deadline',
+            after: `${node.sla.duration.value} business days, then escalate`,
+          },
+          ADMIN_USER,
+          3
+        )
+    if (index === 1 || index === 3) {
+      const version = index === 1 ? 1 : 2
+      const summary = index === 1 ? 'Intake and internal canvas ready for pilot' : 'Added strategic alignment and NDA'
+      log({ level: 'workflow', action: 'published', objectPath: wf.name, after: `Version ${version}: ${summary}` }, DIRECTOR_USER, 45)
+      versions.push({ id: newId('ver'), version, at: audit[audit.length - 1].at, by: DIRECTOR_USER, summary, snapshot: snapshot(index + 1, version) })
+    }
+  })
+  log({ level: 'node', action: 'edited', stageId: wf.stageIds[0], objectPath: `${wf.stages[wf.stageIds[0]].name} › Intake agent analysis › Prompt`, before: 'Previous prompt', after: 'Added the strategic alignment check' }, ADMIN_USER, 90)
+
+  return {
+    workflow: { ...wf, version: 3, publishedVersion: 2, status: 'draft', updatedAt: audit[audit.length - 1].at, updatedBy: ADMIN_USER },
+    audit,
+    versions,
   }
 }

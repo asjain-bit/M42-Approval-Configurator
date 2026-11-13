@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ArrowRight, Fingerprint, Loader2, Lock } from 'lucide-react'
 import { APP_NAME } from '@/lib/session'
 
@@ -25,78 +25,120 @@ const PORTRAITS = [
   'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=96&h=96&auto=format&fit=crop&q=80',
 ]
 
-/** Decorative workflow: a request travels from the form, through the AI agent, to the reviewers and is approved */
-const FlowIllustration: React.FC = () => (
-  <svg viewBox="0 0 440 300" className="w-full max-w-[420px] h-auto select-none" aria-hidden="true" fill="none">
-    {/* Orbit rings */}
-    <circle cx="220" cy="140" r="122" stroke="#cfe9ec" strokeDasharray="2 6" />
-    <circle cx="220" cy="140" r="84" stroke="#d9eef1" />
+const PIPELINE = ['Intake', 'Internal canvas', 'Strategy', 'NDA', 'Due diligence']
+const CARD = { w: 96, h: 62 }
+/** Card positions along a gentle wave, left to right across the panel */
+const SPOTS = [
+  { x: 2, y: 128 },
+  { x: 109, y: 96 },
+  { x: 216, y: 128 },
+  { x: 323, y: 96 },
+  { x: 430, y: 128 },
+]
+const centre = (i: number) => ({ x: SPOTS[i].x + CARD.w / 2, y: SPOTS[i].y + CARD.h / 2 })
 
-    {/* Connectors */}
-    <path d="M100 76 C 150 76, 150 140, 186 140" stroke="#7fd6dc" strokeWidth="1.75" className="login-dash" />
-    <path d="M254 140 C 292 140, 296 86, 330 82" stroke="#7fd6dc" strokeWidth="1.75" className="login-dash" />
-    <path d="M254 140 C 292 140, 296 196, 330 200" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 5" />
-    <circle r="3.5" fill="#0f8a93">
-      <animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.45 0 0.55 1" path="M100 76 C 150 76, 150 140, 186 140 L 254 140 C 292 140, 296 86, 330 82" />
-    </circle>
+/** Which stage is being processed: steps through each card in turn, then starts over */
+function usePipelineStep() {
+  const [step, setStep] = useState(0)
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return setStep(PIPELINE.length)
+    const t = setTimeout(() => setStep((s) => (s >= PIPELINE.length ? 0 : s + 1)), step >= PIPELINE.length ? 2200 : 1500)
+    return () => clearTimeout(t)
+  }, [step])
+  return step
+}
 
-    {/* Form card */}
-    <g className="login-float">
-      <rect x="18" y="46" width="86" height="62" rx="12" fill="#ffffff" stroke="#e2e8f0" />
-      <rect x="30" y="58" width="18" height="18" rx="5" fill="#ddf7f9" />
-      <path d="M35 65h8M35 69.5h5" stroke="#0f8a93" strokeWidth="1.6" strokeLinecap="round" />
-      <rect x="54" y="60" width="38" height="5" rx="2.5" fill="#36c0c9" />
-      <rect x="54" y="70" width="26" height="4" rx="2" fill="#cfe9ec" />
-      <rect x="30" y="86" width="62" height="4" rx="2" fill="#eef2f6" />
-      <rect x="30" y="95" width="42" height="4" rx="2" fill="#eef2f6" />
-    </g>
-
-    {/* AI agent */}
-    <g>
-      <circle cx="220" cy="140" r="34" fill="#ffffff" fillOpacity="0.55" stroke="#ffffff" strokeOpacity="0.9" />
-      <circle cx="220" cy="140" r="27" fill="#36c0c9" fillOpacity="0.22" stroke="#ffffff" strokeWidth="1.5" className="login-breathe" />
-      <ellipse cx="212" cy="128" rx="13" ry="6" fill="#ffffff" fillOpacity="0.6" />
-      <circle cx="220" cy="140" r="34" stroke="#36c0c9" strokeWidth="1.5" strokeDasharray="10 14" strokeLinecap="round" className="login-spin" />
-      <g className="login-sparkle">
-        <path d="M220 126 l3.6 8.4 8.4 3.6 -8.4 3.6 -3.6 8.4 -3.6 -8.4 -8.4 -3.6 8.4 -3.6z" fill="#0f8a93" />
+const StageCard: React.FC<{ index: number; status: 'done' | 'active' | 'pending' }> = ({ index, status }) => {
+  const { x, y } = SPOTS[index]
+  return (
+    <g transform={`translate(${x} ${y})`} className="login-card" data-status={status}>
+      <rect width={CARD.w} height={CARD.h} rx="12" fill="#ffffff" stroke={status === 'active' ? '#36c0c9' : '#e2e8f0'} strokeWidth={status === 'active' ? 1.5 : 1} />
+      <text x="12" y="20" fontSize="9" fontWeight="600" fill="#0f8a93" letterSpacing="0.4">
+        STAGE {index + 1}
+      </text>
+      <text x="12" y="34" fontSize="9.5" fontWeight="600" fill="#334155">
+        {PIPELINE[index]}
+      </text>
+      {/* Status */}
+      <g transform="translate(12 42)">
+        {status === 'done' && (
+          <>
+            <circle cx="6" cy="6" r="6" fill="#22c55e" />
+            <path d="M3.4 6.2l1.8 1.8 3.6-3.6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <text x="16" y="9" fontSize="8.5" fill="#16a34a" fontWeight="600">Completed</text>
+          </>
+        )}
+        {status === 'active' && (
+          <>
+            <circle cx="6" cy="6" r="5" stroke="#cfe9ec" strokeWidth="2" fill="none" />
+            <circle cx="6" cy="6" r="5" stroke="#36c0c9" strokeWidth="2" strokeLinecap="round" strokeDasharray="9 23" fill="none" className="login-spinner" />
+            <text x="16" y="9" fontSize="8.5" fill="#0f8a93" fontWeight="600">Processing</text>
+          </>
+        )}
+        {status === 'pending' && (
+          <>
+            <circle cx="6" cy="6" r="5" fill="#facc15" />
+            <text x="16" y="9" fontSize="8.5" fill="#a16207" fontWeight="600">Pending</text>
+          </>
+        )}
       </g>
-      <path d="M233 125 l1.4 3.1 3.1 1.4 -3.1 1.4 -1.4 3.1 -1.4 -3.1 -3.1 -1.4 3.1 -1.4z" fill="#36c0c9" className="login-twinkle" />
     </g>
+  )
+}
 
-    {/* Approved */}
-    <g className="login-float-slow">
-      <rect x="330" y="58" width="92" height="48" rx="12" fill="#ffffff" stroke="#b5e7eb" />
-      <circle cx="350" cy="82" r="10" fill="#36c0c9" />
-      <path d="M345.5 82l3 3 6-6" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="366" y="76" width="42" height="5" rx="2.5" fill="#0f8a93" />
-      <rect x="366" y="86" width="28" height="4" rx="2" fill="#cfe9ec" />
-    </g>
+/** Decorative workflow: an AI agent moves a request through each stage in turn, marking each one complete */
+const FlowIllustration: React.FC = () => {
+  const step = usePipelineStep()
+  const path = SPOTS.map((_, i) => centre(i))
+    .map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`)
+    .join(' ')
+  const at = centre(Math.min(step, PIPELINE.length - 1))
+  const done = Math.min(step, PIPELINE.length - 1)
 
-    {/* Waiting */}
-    <g>
-      <rect x="330" y="178" width="92" height="44" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeDasharray="3 4" />
-      <circle cx="350" cy="200" r="8" stroke="#94a3b8" strokeWidth="1.6" />
-      <path d="M350 195.5v4.5l3 2" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" />
-      <rect x="366" y="197" width="34" height="5" rx="2.5" fill="#e2e8f0" />
-    </g>
+  return (
+    <svg viewBox="0 0 528 300" className="w-full max-w-[560px] h-auto select-none" aria-hidden="true" fill="none">
+      {/* Track, and the part already travelled */}
+      <path d={path} stroke="#d9eef1" strokeWidth="2" strokeDasharray="4 5" />
+      <path
+        d={SPOTS.slice(0, done + 1)
+          .map((_, i) => centre(i))
+          .map((p, i) => `${i ? 'L' : 'M'} ${p.x} ${p.y}`)
+          .join(' ')}
+        stroke="#36c0c9"
+        strokeWidth="2"
+        className="login-dash"
+      />
 
-    {/* Reviewers */}
-    <g className="login-float">
-      <rect x="138" y="226" width="164" height="40" rx="20" fill="#ffffff" stroke="#e2e8f0" />
-      {PORTRAITS.map((src, i) => (
-        <Avatar key={src} id={String(i)} x={160 + i * 22} y={246} src={src} />
+      {/* AI agent overseeing the run */}
+      <g transform="translate(264 44)">
+        <circle r="30" fill="#ffffff" fillOpacity="0.55" stroke="#ffffff" />
+        <circle r="23" fill="#36c0c9" fillOpacity="0.22" stroke="#ffffff" strokeWidth="1.5" className="login-breathe" />
+        <circle r="30" stroke="#36c0c9" strokeWidth="1.5" strokeDasharray="9 13" strokeLinecap="round" className="login-spin" />
+        <g className="login-sparkle">
+          <path d="M0 -12 l3.2 7.6 7.6 3.2 -7.6 3.2 -3.2 7.6 -3.2 -7.6 -7.6 -3.2 7.6 -3.2z" fill="#0f8a93" />
+        </g>
+      </g>
+      <path d={`M264 74 L ${at.x} ${at.y - CARD.h / 2}`} stroke="#7fd6dc" strokeWidth="1.25" strokeDasharray="2 4" style={{ transition: 'd 0.6s ease' }} />
+
+      {SPOTS.map((_, i) => (
+        <StageCard key={i} index={i} status={i < step ? 'done' : i === step ? 'active' : 'pending'} />
       ))}
-      <rect x="226" y="239" width="56" height="5" rx="2.5" fill="#0f8a93" />
-      <rect x="226" y="249" width="38" height="4" rx="2" fill="#cfe9ec" />
-    </g>
 
-    {/* Sparkles */}
-    <path d="M300 30 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" fill="#36c0c9" className="login-twinkle" />
-    <path d="M56 196 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z" fill="#7fd6dc" className="login-twinkle-late" />
-    <circle cx="404" cy="140" r="2.5" fill="#7fd6dc" />
-    <circle cx="36" cy="140" r="2" fill="#cfe9ec" />
-  </svg>
-)
+      {/* The request travelling between stages */}
+      <circle r="5" fill="#0f8a93" stroke="#ffffff" strokeWidth="2" style={{ transform: `translate(${at.x}px, ${at.y + CARD.h / 2}px)`, transition: 'transform 0.6s cubic-bezier(.45,0,.55,1)' }} />
+
+      {/* Reviewers */}
+      <g transform="translate(176 232)">
+        <rect width="176" height="40" rx="20" fill="#ffffff" stroke="#e2e8f0" />
+        {PORTRAITS.map((src, i) => (
+          <Avatar key={src} id={String(i)} x={22 + i * 22} y={20} src={src} />
+        ))}
+        <text x="96" y="18" fontSize="9.5" fontWeight="600" fill="#0f8a93">Reviewers</text>
+        <text x="96" y="30" fontSize="8.5" fill="#64748b">notified by email</text>
+      </g>
+    </svg>
+  )
+}
 
 /**
  * LoginScreen — Screen
@@ -143,6 +185,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         .login-sparkle { animation: login-sparkle 3.2s ease-in-out infinite }
         .login-twinkle { animation: login-twinkle 2.8s ease-in-out infinite }
         .login-twinkle-late { animation: login-twinkle 2.8s ease-in-out 1.4s infinite }
+        @keyframes login-spinner { to { transform: rotate(360deg) } }
+        .login-spinner { transform-box: fill-box; transform-origin: center; animation: login-spinner 0.9s linear infinite }
+        @keyframes login-pop { from { opacity: .6; transform: translateY(2px) } to { opacity: 1; transform: none } }
+        .login-card > g { animation: login-pop .35s ease-out }
         @media (prefers-reduced-motion: reduce) {
           .login-float, .login-float-slow, .login-dash, .login-spin, .login-breathe, .login-sparkle, .login-twinkle, .login-twinkle-late { animation: none }
         }

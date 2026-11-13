@@ -46,7 +46,7 @@ const isTyping = (el: EventTarget | null) =>
  * Stage bar, node palette, canvas and configuration form for one stage.
  * Used in: StagePage
  */
-export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = ({ workflowId, stageId }) => {
+export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = ({ workflowId, stageId: initialStageId }) => {
   const router = useRouter()
   const params = useSearchParams()
   const toast = useToast()
@@ -61,6 +61,27 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [picker, setPicker] = useState<{ nodeId: string; outcomeKey: string } | null>(null)
   const [addingStage, setAddingStage] = useState(false)
+
+  // Switching stages stays on this page (only the address changes), so the canvas glides to the next stage instead of reloading
+  const [stageId, setStageId] = useState(initialStageId)
+  useEffect(() => setStageId(initialStageId), [initialStageId])
+  const openStage = useCallback(
+    (id: string) => {
+      if (id === stageId) return
+      setSelection(null)
+      setStageId(id)
+      window.history.pushState(null, '', `/workflows/${workflowId}/stages/${id}`)
+    },
+    [stageId, workflowId]
+  )
+  useEffect(() => {
+    const onPop = () => {
+      const id = window.location.pathname.split('/stages/')[1]?.split(/[/?]/)[0]
+      if (id) setStageId(id)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   const stage = workflow?.stages[stageId]
 
@@ -376,10 +397,16 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
 
   const goToIssue = (issue: Issue) => {
     if (issue.stageId !== stageId) {
-      const p = new URLSearchParams()
-      if (issue.nodeId) p.set('node', issue.nodeId)
-      if (issue.field) p.set('field', issue.field)
-      router.push(`/workflows/${workflowId}/stages/${issue.stageId}?${p}`)
+      openStage(issue.stageId)
+      if (issue.nodeId) {
+        const nodeId = issue.nodeId
+        setTimeout(() => {
+          setSelection({ kind: 'node', id: nodeId })
+          setFormCollapsed(false)
+          setFocus((f) => ({ field: issue.field ?? null, tick: f.tick + 1 }))
+          canvas.current?.focusNode(nodeId)
+        }, 650)
+      }
       return
     }
     if (issue.nodeId) {
@@ -415,19 +442,18 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
           health={health}
           collapsed={paletteCollapsed}
           onToggle={() => setPaletteCollapsed((v) => !v)}
-          onSelect={(id) => router.push(`/workflows/${workflowId}/stages/${id}`)}
+          onSelect={openStage}
           onAdd={() => setAddingStage(true)}
         />
 
         <div className="relative flex-1 min-w-0 flex">
           <ReactFlowProvider>
             <FlowCanvas
-              key={stageId}
               ref={canvas}
               workflow={workflow}
               stageId={stageId}
               health={health}
-              onOpenStage={(id) => router.push(`/workflows/${workflowId}/stages/${id}`)}
+              onOpenStage={openStage}
               issueCounts={issueCounts}
               selection={selection}
               onSelect={(s) => {

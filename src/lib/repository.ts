@@ -4,7 +4,7 @@
  */
 
 import { newId } from '@/lib/id'
-import { internalCanvasStage, seedWorkflow } from '@/lib/seed'
+import { internalCanvasStage, seedHistory, seedWorkflow } from '@/lib/seed'
 import { ADMIN_PROFILE } from '@/lib/session'
 import { getNodeType } from '@/lib/registry/nodes'
 import { clone, createNode, normalizeStage } from '@/lib/workflow/graph'
@@ -32,7 +32,7 @@ interface Store {
 }
 
 // v9: all six stages rebuilt
-const STORAGE_KEY = 'm42-workflow-configurator.v10'
+const STORAGE_KEY = 'm42-workflow-configurator.v11'
 
 let memory: Store | null = null
 
@@ -149,8 +149,8 @@ function load(): Store {
   } catch {
     // Fall through to seed
   }
-  const seeded = seedWorkflow()
-  memory = { workflows: { [seeded.id]: seeded }, audit: { [seeded.id]: [] } }
+  const { workflow: seeded, audit, versions } = seedHistory(seedWorkflow())
+  memory = { workflows: { [seeded.id]: seeded }, audit: { [seeded.id]: audit }, versions: { [seeded.id]: versions } }
   persist()
   return memory
 }

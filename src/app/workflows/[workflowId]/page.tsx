@@ -27,7 +27,17 @@ export default function WorkflowPage({ params }: { params: Promise<{ workflowId:
     <AppShell
       activeTab="dashboard"
       header={
-        workflow ? <WorkflowHeader workflow={workflow} audit={audit} allWorkflows={allWorkflows} save={save} /> : <div />
+        workflow ? (
+          <WorkflowHeader
+            workflow={workflow}
+            audit={audit}
+            allWorkflows={allWorkflows}
+            save={save}
+            openCanvasHref={workflow.stageIds[0] ? `/workflows/${workflow.id}/stages/${workflow.stageIds[0]}` : undefined}
+          />
+        ) : (
+          <div />
+        )
       }
     >
       {workflow && <StagesScreen workflow={workflow} save={save} />}

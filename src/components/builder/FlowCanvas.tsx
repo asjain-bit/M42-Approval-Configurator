@@ -295,6 +295,17 @@ export const FlowCanvas = forwardRef<CanvasApi, Props>(function FlowCanvas(
     [active]
   )
 
+  // Moving to another stage: glide over to its box rather than jumping
+  const firstStage = useRef(stageId)
+  useEffect(() => {
+    if (firstStage.current === stageId) return
+    firstStage.current = stageId
+    setMenu(null)
+    setPicker(null)
+    const t = setTimeout(() => flow.fitView({ nodes: [{ id: `box:${stageId}` }], padding: 0.12, duration: 600, ease: (t) => 1 - Math.pow(1 - t, 3) }), 30)
+    return () => clearTimeout(t)
+  }, [stageId, flow])
+
   useImperativeHandle(ref, () => ({
     centerPosition: () => {
       const el = document.querySelector('.react-flow') as HTMLElement | null
