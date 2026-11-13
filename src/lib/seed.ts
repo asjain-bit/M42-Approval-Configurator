@@ -37,7 +37,7 @@ const reminder = (days: number): Reminder => ({
 
 
 const sla = (days: number | null, reminders: Reminder[] = [], breachIn: BreachAction | null = null): SlaConfig => {
-  const breach = breachIn ? { ...breachIn, markAtRisk: true } : null
+  const breach = breachIn
   return {
     enabled: true,
     duration: { value: days, unit: 'businessDays' },
@@ -45,6 +45,12 @@ const sla = (days: number | null, reminders: Reminder[] = [], breachIn: BreachAc
     reminders,
     breachAction: breach,
   }
+}
+
+/** Reminders go to the step's role or team by name (reminders don't offer "this step's assignees") */
+const remindAssignee = (sla: SlaConfig, assignee: string): SlaConfig => {
+  const who = assignee.startsWith('role-') ? { kind: 'role' as const, roleId: assignee } : assignee.startsWith('team-') ? { kind: 'team' as const, teamId: assignee } : null
+  return { ...sla, reminders: sla.reminders.map((r) => ({ ...r, recipients: who ? [who] : r.recipients })) }
 }
 
 /** Build a stage from specs, wiring outcomes by label → ref. Optional hand-placed positions (by ref) replace auto-layout. */
@@ -59,7 +65,7 @@ function buildStage(name: string, description: string, specs: Spec[], positions?
       name: s.name,
       description: s.description ?? '',
       config: { ...base.config, ...(s.config ?? {}) },
-      ...(s.sla ? { sla: s.sla } : {}),
+      ...(s.sla ? { sla: remindAssignee(s.sla, String(s.config?.assignee ?? '')) } : {}),
       ...(s.toConfirm ? { toConfirm: s.toConfirm } : {}),
     })
     stage.nodes[node.id] = node

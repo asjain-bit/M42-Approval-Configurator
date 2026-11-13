@@ -114,10 +114,9 @@ export type BreachAction = (
   | { kind: 'notifyOnly'; to: Recipient[]; templateId: ID; email?: { for: ID; text: string } }
   | { kind: 'takeOutcome'; outcomeId: ID }
   | { kind: 'routeTo'; nodeId: ID }
-) & {
-  /** Also set the request's status to "At risk" when the deadline is missed */
-  markAtRisk?: boolean
-}
+  /** Set the request's status to "At risk" */
+  | { kind: 'markAtRisk' }
+)
 
 export type BreachKind = BreachAction['kind']
 

@@ -94,6 +94,8 @@ interface Props {
   caseFields: CaseField[]
   id?: string
   invalid?: boolean
+  /** Reminders: no step assignees or case people, roles grouped by level, vendor needs no extra choice */
+  reminder?: boolean
 }
 
 /**
@@ -101,13 +103,15 @@ interface Props {
  * People picker for roles, teams, people, vendor or people stored on the case.
  * Used in: NodeForm, SlaBlock, WorkflowSettingsModal
  */
-export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds = ALL_KINDS, caseFields, id, invalid }) => {
+export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds: kindsIn = ALL_KINDS, caseFields, id, invalid, reminder }) => {
+  const kinds = reminder ? kindsIn.filter((k) => k !== 'stepAssignees' && k !== 'fromCaseField') : kindsIn
+  const pickPeople = reminder || kinds.includes('vendor')
   const peopleFields = caseFields.filter((f) => ['people', 'person', 'list'].includes(f.type))
   const update = (i: number, r: Recipient) => onChange(value.map((v, idx) => (idx === i ? r : v)))
 
   return (
-    <div id={id} className={`flex flex-col gap-2 ${invalid ? 'rounded-lg ring-2 ring-red-200 p-1.5' : ''}`}>
-      {value.length === 0 && <p className="text-[11px] text-[#94a3b8]">Nobody added yet.</p>}
+    <div id={id} className={`flex flex-col gap-2 `}>
+      {value.length === 0 && <p className={`text-[11px] ${invalid ? 'text-red-600' : 'text-[#94a3b8]'}`}>{invalid ? 'Add at least one person.' : 'Nobody added yet.'}</p>}
       {value.map((r, i) => (
         <div key={i} className="flex items-start gap-2">
           <select
@@ -125,13 +129,32 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds = ALL
           {r.kind === 'role' && (
             <div className="min-w-0 flex-1 flex flex-col gap-1.5">
               <select aria-label="Role" className={inputSmall} value={r.roleId} onChange={(e) => update(i, { kind: 'role', roleId: e.target.value })}>
-                {ROLES.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
+                {reminder ? (
+                  <>
+                    <optgroup label="Application level role">
+                      {ROLES.filter((x) => !x.perCase).map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Case level role">
+                      {ROLES.filter((x) => x.perCase).map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  ROLES.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))
+                )}
               </select>
-              {kinds.includes('vendor') && !ROLES.find((x) => x.id === r.roleId)?.perCase && (
+              {pickPeople && !ROLES.find((x) => x.id === r.roleId)?.perCase && (
                 <MultiSelect
                   label="People in this role"
                   allText="Everyone in this role"
@@ -151,7 +174,7 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds = ALL
                   </option>
                 ))}
               </select>
-              {kinds.includes('vendor') && (
+              {pickPeople && (
                 <MultiSelect
                   label="People in this team"
                   allText="Everyone in this team"
@@ -162,7 +185,7 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds = ALL
               )}
             </div>
           )}
-          {r.kind === 'vendor' && (
+          {r.kind === 'vendor' && !reminder && (
             <MultiSelect
               label="Vendor contacts"
               allText="All vendor contacts"
@@ -198,7 +221,7 @@ export const RecipientsEditor: React.FC<Props> = ({ value, onChange, kinds = ALL
               ))}
             </select>
           )}
-          {r.kind === 'stepAssignees' && <div className="flex-1" />}
+          {(r.kind === 'stepAssignees' || (r.kind === 'vendor' && reminder)) && <div className="flex-1" />}
           <button
             type="button"
             aria-label="Remove"

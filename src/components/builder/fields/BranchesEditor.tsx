@@ -133,7 +133,7 @@ const RuleRow: React.FC<{ rule: Rule; fields: CaseField[]; onChange: (r: Rule) =
   return (
     <div className="rounded-lg bg-slate-50 border border-[#eef2f6] p-2.5 flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <select aria-label="Field" className={`${inputSmall} ${known ? '' : 'border-red-400'}`} value={leftKey(rule)} onChange={(e) => setLeft(e.target.value)}>
+        <select aria-label="Field" className={`${inputSmall} `} value={leftKey(rule)} onChange={(e) => setLeft(e.target.value)}>
           {!known && <option value={leftKey(rule)}>A removed field</option>}
           {lists.length > 0 && (
             <optgroup label="Counts">

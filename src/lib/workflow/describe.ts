@@ -90,6 +90,8 @@ export function breachText(
       return `Take outcome: ${node?.outcomes.find((o) => o.id === b.outcomeId)?.label ?? '?'}`
     case 'routeTo':
       return `Go to ${nodeName?.(b.nodeId) ?? 'node'}`
+    case 'markAtRisk':
+      return 'Update the status to At Risk'
   }
 }
 

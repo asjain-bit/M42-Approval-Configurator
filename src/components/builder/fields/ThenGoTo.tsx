@@ -36,7 +36,7 @@ export const ThenGoTo: React.FC<{ outcomeKey: string; label?: string; compact?: 
           disabled={locked}
           title={locked ? `Fill in ${routing.missing!.join(', ')} first` : undefined}
           aria-label={`${outcome.label}: then go to`}
-          className={`${inputSmall} ${connected ? '' : 'border-red-300 bg-red-50/40'}`}
+          className={`${inputSmall} `}
           value={
             outcome.targetStageId
               ? `${STAGE}${outcome.targetStageId}`

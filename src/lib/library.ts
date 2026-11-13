@@ -357,7 +357,9 @@ export const ROLES: Role[] = [
   { id: 'role-partnership-director', name: 'Partnership Director', memberIds: ['u13'] },
   { id: 'role-superadmin', name: 'Superadmin', memberIds: ['u14'] },
   { id: 'role-tdd-admin', name: 'TDD Admin', memberIds: ['u15', 'u16'] },
+  { id: 'role-service-line-owner', name: 'Service line owner', memberIds: ['u1', 'u2', 'u3'] },
   { id: 'role-sponsor', name: 'Sponsor (chosen in Internal Canvas)', perCase: true },
+  { id: 'role-internal-interest', name: 'Internal interest', perCase: true },
 ]
 
 export const USERS: User[] = [

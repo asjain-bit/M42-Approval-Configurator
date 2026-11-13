@@ -174,7 +174,8 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
   ) : null
 
   const inputId = id ? `${id}-input` : undefined
-  const errorRing = missing ? 'border-red-300 hover:border-red-300 focus:border-red-400 focus:ring-red-100' : ''
+  // Errors show as a message under the input only, never as a red outline
+  const errorRing = ''
 
   let control: React.ReactNode = null
   switch (field.kind) {
@@ -197,7 +198,7 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
         <>
           <textarea
             id={inputId}
-            className={`${textareaBase} text-xs ${errorRing} ${field.rows ? '[field-sizing:content] !max-h-none' : ''}`}
+            className={`${textareaBase} text-xs ${errorRing} ${field.fixedHeight ? 'resize-none overflow-y-auto' : field.rows ? '[field-sizing:content] !max-h-none' : ''}`}
             rows={field.rows}
             value={String(value ?? '')}
             placeholder={field.placeholder}
@@ -258,7 +259,7 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
     case 'caseFieldSelect': {
       const known = !value || options.some((o) => o.value === value)
       control = (
-        <select id={inputId} className={`${inputSmall} ${errorRing} ${known ? '' : 'border-red-400'}`} value={String(value ?? '')} onChange={(e) => set(e.target.value)}>
+        <select id={inputId} className={`${inputSmall} ${errorRing} `} value={String(value ?? '')} onChange={(e) => set(e.target.value)}>
           <option value="">{field.placeholder ?? 'Choose…'}</option>
           {!known && <option value={String(value)}>A removed field</option>}
           <OptionList options={options} />
@@ -283,7 +284,7 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
       const selected = asArr<string>(value)
       const missingKeys = selected.filter((s) => !options.some((o) => o.value === s))
       control = (
-        <div className={`flex flex-col gap-1 max-h-56 overflow-y-auto rounded-lg border p-2 ${missing ? 'border-red-300' : 'border-[#e2e8f0]'}`}>
+        <div className={`flex flex-col gap-1 max-h-56 overflow-y-auto rounded-lg border p-2 border-[#e2e8f0]`}>
           {missingKeys.map((k) => (
             <span key={k} className="flex items-center justify-between text-xs text-red-600 px-1">
               A removed field

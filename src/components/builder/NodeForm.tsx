@@ -264,7 +264,7 @@ export const NodeForm: React.FC<Props> = ({
               </label>
               <input
                 id="node-name"
-                className={`${inputSmall} ${!node.name.trim() || nameTaken ? 'border-red-300' : ''}`}
+                className={`${inputSmall} `}
                 value={node.name}
                 maxLength={80}
                 onChange={(e) =>

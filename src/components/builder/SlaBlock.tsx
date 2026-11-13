@@ -66,7 +66,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                 type="number"
                 min={1}
                 aria-label="Time limit amount"
-                className={`${inputSmall} !w-24 ${durationMissing ? 'border-red-300' : ''}`}
+                className={`${inputSmall} !w-24 `}
                 value={sla.duration.value ?? ''}
                 placeholder={agent ? '[N]' : ''}
                 onChange={(e) =>
@@ -162,7 +162,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                   <p className="text-[11px] text-[#64748b]">Sent by email.</p>
                   <div>
                     <span className={labelBase}>Send to</span>
-                    <RecipientsEditor value={r.recipients} onChange={(recipients) => setReminder(i, { recipients })} caseFields={caseFields} />
+                    <RecipientsEditor reminder value={r.recipients} onChange={(recipients) => setReminder(i, { recipients })} caseFields={caseFields} />
                   </div>
                   <div>
                     <label className={labelBase}>Email template</label>
@@ -190,7 +190,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                           after: { value: 1, unit: 'businessDays' },
                           sendAt: '',
                           channels: ['email'],
-                          recipients: [{ kind: 'stepAssignees' }],
+                          recipients: [],
                           templateId: '',
                         },
                       ],
@@ -206,7 +206,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
 
           <div>
             <span className={labelBase}>
-              {agent ? 'If the agent takes too long' : 'If the deadline is missed'} <span className="text-red-600">*</span>
+              {agent ? 'If the agent takes too long' : 'SLA Breached'} <span className="text-red-600">*</span>
             </span>
             <BreachActionEditor
               value={sla.breachAction}

@@ -86,6 +86,8 @@ export interface FieldSchema {
   units?: OptionItem[]
   /** For 'textarea': visible lines before it grows with its content */
   rows?: number
+  /** For 'textarea': keep the height fixed at `rows` and scroll inside when the text is longer */
+  fixedHeight?: boolean
   /** For a template 'select': key where the admin's own wording of the email is kept; the email is shown below */
   emailKey?: string
 }

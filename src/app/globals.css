@@ -136,8 +136,6 @@ select {
   z-index: 1000 !important;
 }
 
-/* A form field that has a validation error */
-.field-error { outline: 2px solid #fca5a5; outline-offset: 4px; border-radius: 10px; }
 
 /* A step still being set up: no red error marks yet (mandatory * markers stay) */
 .quiet-issues p.text-red-600 { display: none; }

@@ -165,16 +165,6 @@ const formSubmission: NodeTypeDef = {
       title: 'Form',
       fields: [
         { key: 'formId', label: 'Form', kind: 'select', required: true, options: formOptions },
-        {
-          key: 'submitters',
-          label: 'Who can submit',
-          kind: 'radio',
-          options: opt([
-            ['vendors', 'Vendors, through the portal'],
-            ['internal', 'Internal users'],
-          ]),
-        },
-        { key: 'confirmationMessage', label: 'Message shown after submitting', kind: 'textarea', maxLength: 300 },
       ],
     },
     {
@@ -419,6 +409,7 @@ const closeRequest: NodeTypeDef = {
           options: opt([
             ['required', 'Mandatory'],
             ['optional', 'Optional'],
+            ['none', 'Not required'],
           ]),
         },
         {
@@ -429,6 +420,7 @@ const closeRequest: NodeTypeDef = {
             ['step', 'The agent or person who closes it'],
             ['fixed', 'A fixed reason I write here'],
           ]),
+          showIf: (s) => s.reasonMode !== 'none',
         },
         {
           key: '_stepReason',
@@ -436,7 +428,7 @@ const closeRequest: NodeTypeDef = {
           kind: 'note',
           text: (s) =>
             `The agent or reviewer ${s.reasonMode === 'required' ? 'must' : 'can'} state the reason when they close the request. It is added to the email as {reason}.`,
-          showIf: (s) => s.reasonSource !== 'fixed',
+          showIf: (s) => s.reasonMode !== 'none' && s.reasonSource !== 'fixed',
         },
         {
           key: 'reason',
@@ -445,7 +437,7 @@ const closeRequest: NodeTypeDef = {
           required: true,
           maxLength: 200,
           placeholder: 'e.g. The vendor cancelled the form',
-          showIf: (s) => s.reasonSource === 'fixed',
+          showIf: (s) => s.reasonMode !== 'none' && s.reasonSource === 'fixed',
         },
       ],
     },
@@ -487,19 +479,8 @@ const closeRequest: NodeTypeDef = {
         message: `${incoming.length} results lead here (${incoming.join(', ')}). Each one needs its own Close request step.`,
       })
     if (byPeople.length === 0) return out
-    if (n.config.reasonMode !== 'required')
-      out.push({ severity: 'error', message: 'A person closes the request here, so the reason must be mandatory.', field: 'reasonMode' })
     if (!n.config.emailVendor)
       out.push({ severity: 'error', message: 'A person closes the request here, so the vendor must be emailed the reason.', field: 'emailVendor' })
-    for (const s of byPeople)
-      for (const o of s.outcomes.filter((o) => o.targetNodeId === n.id))
-        if (!asString((items(s.config.outcomes).find((i) => i.id === o.key) as { ask?: unknown } | undefined)?.ask).trim())
-          out.push({
-            severity: 'error',
-            nodeId: s.id,
-            field: 'outcomes',
-            message: `The result “${o.label}” closes the request at “${n.name}”, so fill in “Ask the reviewer for” (e.g. the reason) under Possible results.`,
-          })
     return out
   },
 }
@@ -710,11 +691,12 @@ const step: NodeTypeDef = {
         { key: 'agentId', label: 'Agent', kind: 'select', required: true, allowCustom: true, options: agentOptions },
         {
           key: 'prompt',
-          label: 'Instructions for the agent (prompt)',
+          label: 'Agent Prompt',
           kind: 'textarea',
           required: true,
           maxLength: 4000,
           rows: 14,
+          fixedHeight: true,
           placeholder: 'Tell the agent what to do, which checks to run and what to produce',
           help: 'Filled in from the agent you choose. Edit it to change what the agent does.',
         },
@@ -903,14 +885,6 @@ const step: NodeTypeDef = {
           newItem: () => newItem(),
           itemSchema: [
             { key: 'label', label: 'Result name', kind: 'text', required: true, placeholder: 'e.g. Approved' },
-            {
-              key: 'ask',
-              label: 'Ask the reviewer for (optional)',
-              kind: 'text',
-              maxLength: 80,
-              placeholder: 'e.g. Reason for rejection',
-              showIf: (_s, ctx) => actorOf(ctx.node.config) === 'human',
-            },
           ],
         },
       ],

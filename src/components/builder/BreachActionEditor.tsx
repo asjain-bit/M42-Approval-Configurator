@@ -9,6 +9,7 @@ import { Toggle } from './fields/Toggle'
 import { EmailPreview } from './EmailPreview'
 
 const KIND_LABELS: Record<BreachKind, string> = {
+  markAtRisk: 'Update the status to At Risk',
   closeRequest: 'Close the request',
   escalate: 'Escalate to someone',
   reassign: 'Hand it to someone else',
@@ -35,7 +36,7 @@ interface Props {
 export const BreachActionEditor: React.FC<Props> = ({
   value,
   onChange,
-  kinds = ['closeRequest', 'escalate', 'reassign', 'notifyOnly', 'takeOutcome', 'routeTo'],
+  kinds = ['markAtRisk', 'closeRequest', 'escalate', 'reassign', 'notifyOnly', 'takeOutcome', 'routeTo'],
   node,
   stage,
   caseFields,
@@ -43,6 +44,8 @@ export const BreachActionEditor: React.FC<Props> = ({
 }) => {
   const setKind = (kind: string) => {
     switch (kind as BreachKind | '') {
+      case 'markAtRisk':
+        return onChange({ kind: 'markAtRisk' })
       case 'closeRequest':
         return onChange({ kind: 'closeRequest', statusLabel: 'Closed – deadline missed', notifyVendor: false })
       case 'escalate':
@@ -64,7 +67,7 @@ export const BreachActionEditor: React.FC<Props> = ({
     <div className="flex flex-col gap-3">
       <select
         aria-label="When the time limit is missed"
-        className={`${inputSmall} ${invalid && !value ? 'border-red-400' : ''}`}
+        className={`${inputSmall} `}
         value={value?.kind ?? ''}
         onChange={(e) => setKind(e.target.value)}
       >
@@ -76,13 +79,7 @@ export const BreachActionEditor: React.FC<Props> = ({
         ))}
       </select>
       {invalid && !value && <p className="text-[11px] text-red-600 -mt-2">Choose what happens when the time limit is missed.</p>}
-      {value && value.kind !== 'closeRequest' && (
-        <Toggle
-          label="Update the request status to “At risk”"
-          checked={!!value.markAtRisk}
-          onChange={(v) => onChange({ ...value, markAtRisk: v })}
-        />
-      )}
+      {value?.kind === 'markAtRisk' && <p className="text-[11px] text-[#64748b] -mt-1">The request status changes to “At risk”. The step keeps waiting for its assignee.</p>}
 
       {value?.kind === 'closeRequest' && (
         <>
@@ -108,7 +105,7 @@ export const BreachActionEditor: React.FC<Props> = ({
                   Email template <span className="text-red-600">*</span>
                 </label>
                 <select
-                  className={`${inputSmall} ${value.templateId ? '' : 'border-red-300'}`}
+                  className={`${inputSmall} `}
                   value={value.templateId ?? ''}
                   onChange={(e) => onChange({ ...value, templateId: e.target.value, emailBody: findTemplate(e.target.value)?.body ?? '' })}
                 >
