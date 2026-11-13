@@ -102,8 +102,16 @@ function nodeIssues(node: WorkflowNode, stage: Stage, workflow: Workflow, ctx: S
     }
   }
 
-  for (const v of def.validate?.(node, ctx) ?? [])
-    issues.push({ ...base, severity: v.severity, field: v.field ? `config:${v.field}` : undefined, message: `"${name}": ${v.message}` })
+  for (const v of def.validate?.(node, ctx) ?? []) {
+    const owner = v.nodeId ? stage.nodes[v.nodeId] : node
+    issues.push({
+      ...base,
+      nodeId: owner?.id ?? node.id,
+      severity: v.severity,
+      field: v.field ? `config:${v.field}` : undefined,
+      message: `Step "${owner?.name.trim() || name}": ${v.message}`,
+    })
+  }
 
   ;(node.toConfirm ?? []).forEach((text, i) =>
     issues.push({ ...base, severity: 'warning', field: 'toConfirm', message: `To confirm – ${name}: ${text}`, toConfirmIndex: i })

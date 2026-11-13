@@ -108,6 +108,8 @@ export interface NodeIssue {
   severity: 'error' | 'warning'
   message: string
   field?: string
+  /** The step the fix belongs to, when it is not the step being checked */
+  nodeId?: string
 }
 
 /** How one step looks on the canvas and in the form header */

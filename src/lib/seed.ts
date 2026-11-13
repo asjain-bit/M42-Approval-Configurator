@@ -104,16 +104,16 @@ function stage1(): Stage {
     {
       ref: 'submit',
       type: 'formSubmission',
-      name: 'Vendor submits the form',
+      name: 'Vendor web form',
       description: 'Vendor fills in the partnership form.',
       config: { formId: 'vendor-intake-form', submitters: 'vendors' },
-      to: { Submitted: 'agent', Cancelled: 'notSubmitted' },
+      to: { Submitted: 'agent', Exited: 'notSubmitted' },
     },
     {
       ref: 'notSubmitted',
       type: 'closeRequest',
-      name: 'Form not submitted',
-      config: { statusLabel: 'Not submitted', reasonMode: 'optional', reasonSource: 'fixed', reason: 'The vendor cancelled the form', emailVendor: false },
+      name: 'Request closed',
+      config: { statusLabel: 'Request closed – vendor exited the form', reasonMode: 'optional', reasonSource: 'fixed', reason: 'The vendor exited the form', emailVendor: false },
     },
     {
       ref: 'agent',
@@ -126,15 +126,15 @@ function stage1(): Stage {
         agentId: 'triage-agent',
         prompt: stepPrompt('intake-agent'),
         tasks: [],
-        outcomes: options('All checks passed', 'Any check failed'),
+        outcomes: options('All checks passed', 'Check failed'),
       },
-      to: { 'All checks passed': 'admin', 'Any check failed': 'rejectedAgent' },
+      to: { 'All checks passed': 'admin', 'Check failed': 'rejectedAgent' },
     },
     {
       ref: 'rejectedAgent',
       type: 'closeRequest',
-      name: 'Rejected by agent',
-      config: rejectAndEmail('Rejected – by agent'),
+      name: 'Request closed – check failed',
+      config: rejectAndEmail('Request closed – check failed'),
     },
     {
       ref: 'admin',
@@ -158,8 +158,8 @@ function stage1(): Stage {
     {
       ref: 'rejectedAdmin',
       type: 'closeRequest',
-      name: 'Rejected by Admin',
-      config: rejectAndEmail('Rejected – by Admin'),
+      name: 'Request closed – by Admin',
+      config: rejectAndEmail('Request closed – by Admin'),
     },
     {
       ref: 'type',
@@ -197,8 +197,8 @@ function stage1(): Stage {
     {
       ref: 'rejectedDirector',
       type: 'closeRequest',
-      name: 'Rejected by Director',
-      config: rejectAndEmail('Rejected – by Director'),
+      name: 'Request closed – by Director',
+      config: rejectAndEmail('Request closed – by Director'),
     },
     {
       ref: 'waiting',
@@ -325,9 +325,9 @@ export function internalCanvasStage(): Stage {
       {
         ref: 'closeNone',
         type: 'closeRequest',
-        name: 'Closed – no one responded',
+        name: 'Request closed – no one responded',
         config: {
-          ...rejectAndEmail('Closed – no internal interest'),
+          ...rejectAndEmail('Request closed – no internal interest'),
           reasonSource: 'fixed',
           reason: 'Nobody in the internal interest team responded',
         },
@@ -352,8 +352,8 @@ export function internalCanvasStage(): Stage {
       {
         ref: 'closeNoSponsor',
         type: 'closeRequest',
-        name: 'Closed by Director',
-        config: rejectAndEmail('Closed – no sponsor'),
+        name: 'Request closed – no sponsor',
+        config: rejectAndEmail('Request closed – no sponsor'),
       },
       {
         ref: 'setSponsor',
@@ -484,7 +484,7 @@ function strategicAlignmentStage(): Stage {
       sla: sla(4, [reminder(3)], escalate),
       to: { Proceed: 'complete', Reject: 'rejected' },
     },
-    { ref: 'rejected', type: 'closeRequest', name: 'Rejected by strategy team', config: rejectAndEmail('Rejected – by strategy team') },
+    { ref: 'rejected', type: 'closeRequest', name: 'Request closed – by strategy team', config: rejectAndEmail('Request closed – by strategy team') },
     { ref: 'complete', type: 'stageComplete', name: 'Stage complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }
@@ -595,7 +595,7 @@ function discoveryCallStage(): Stage {
       sla: sla(3, [reminder(2)], escalate),
       to: { Proceed: 'complete', Reject: 'rejected' },
     },
-    { ref: 'rejected', type: 'closeRequest', name: 'Rejected by Director', config: rejectAndEmail('Rejected – after discovery call') },
+    { ref: 'rejected', type: 'closeRequest', name: 'Request closed – after discovery call', config: rejectAndEmail('Request closed – after discovery call') },
     { ref: 'complete', type: 'stageComplete', name: 'Stage complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }
@@ -661,7 +661,7 @@ function valueStage(): Stage {
       sla: sla(5, [reminder(3)], escalate),
       to: { 'Proceed to sponsor': 'tdd', Reject: 'rejectedValue' },
     },
-    { ref: 'rejectedValue', type: 'closeRequest', name: 'Rejected by sponsor', config: rejectAndEmail('Rejected – by sponsor') },
+    { ref: 'rejectedValue', type: 'closeRequest', name: 'Request closed – by sponsor', config: rejectAndEmail('Request closed – by sponsor') },
     {
       ref: 'tdd',
       type: 'step',
@@ -711,7 +711,7 @@ function valueStage(): Stage {
       sla: sla(5, [reminder(3)], escalate),
       to: { Sponsor: 'complete', 'Do not sponsor': 'rejectedFinal' },
     },
-    { ref: 'rejectedFinal', type: 'closeRequest', name: 'Not sponsored', config: rejectAndEmail('Closed – not sponsored') },
+    { ref: 'rejectedFinal', type: 'closeRequest', name: 'Request closed – not sponsored', config: rejectAndEmail('Request closed – not sponsored') },
     { ref: 'complete', type: 'stageComplete', name: 'Request complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }

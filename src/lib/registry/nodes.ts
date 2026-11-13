@@ -157,7 +157,7 @@ const formSubmission: NodeTypeDef = {
     formId: '',
     submitters: 'vendors',
     confirmationMessage: 'Thank you. Your request has been submitted.',
-    outcomes: itemsOf(['Submitted', 'Cancelled']),
+    outcomes: itemsOf(['Submitted', 'Exited']),
   }),
   configSchema: [
     {
@@ -185,7 +185,7 @@ const formSubmission: NodeTypeDef = {
           key: 'outcomes',
           label: 'Results of this step',
           kind: 'list',
-          help: 'Name each way the form can end, for example "Submitted" and "Cancelled". In the next section you choose where each result leads.',
+          help: 'Name each way the form can end, for example "Submitted" and "Exited". In the next section you choose where each result leads.',
           minItems: 1,
           addLabel: 'Add result',
           newItem: () => newItem(),
@@ -196,7 +196,7 @@ const formSubmission: NodeTypeDef = {
     },
   ],
   getOutcomes: (n) => itemOutcomes(n.config.outcomes, 'Result'),
-  outcomesNote: 'If the vendor cancels, nothing is submitted: send "Cancelled" to a Close request so the request ends.',
+  outcomesNote: 'If the vendor exits, nothing is submitted: send "Exited" to a Close request so the request ends.',
   summary: (n) => nameOf(n.config.formId, findForm) ?? 'No form selected',
   outputs: (n) => {
     const form = findForm(n.config.formId)
@@ -411,7 +411,7 @@ const closeRequest: NodeTypeDef = {
       id: 'close',
       title: 'Closing',
       fields: [
-        { key: 'statusLabel', label: 'Status shown on the request', kind: 'text', required: true, maxLength: 60, placeholder: 'e.g. Rejected – by agent' },
+        { key: 'statusLabel', label: 'Status shown on the request', kind: 'text', required: true, maxLength: 60, placeholder: 'e.g. Request closed – check failed' },
         {
           key: 'reasonMode',
           label: 'Reason for closing',
@@ -478,8 +478,15 @@ const closeRequest: NodeTypeDef = {
     const byPeople = Object.values(ctx.stage.nodes).filter(
       (s) => s.type === 'step' && actorOf(s.config) === 'human' && s.outcomes.some((o) => o.targetNodeId === n.id)
     )
-    if (byPeople.length === 0) return []
     const out: NodeIssue[] = []
+    // Every path that closes the request gets its own Close request step, since each can have its own reason and email
+    const incoming = Object.values(ctx.stage.nodes).flatMap((s) => s.outcomes.filter((o) => o.targetNodeId === n.id).map((o) => `“${s.name}” → “${o.label}”`))
+    if (incoming.length > 1)
+      out.push({
+        severity: 'error',
+        message: `${incoming.length} results lead here (${incoming.join(', ')}). Each one needs its own Close request step.`,
+      })
+    if (byPeople.length === 0) return out
     if (n.config.reasonMode !== 'required')
       out.push({ severity: 'error', message: 'A person closes the request here, so the reason must be mandatory.', field: 'reasonMode' })
     if (!n.config.emailVendor)
@@ -487,7 +494,12 @@ const closeRequest: NodeTypeDef = {
     for (const s of byPeople)
       for (const o of s.outcomes.filter((o) => o.targetNodeId === n.id))
         if (!asString((items(s.config.outcomes).find((i) => i.id === o.key) as { ask?: unknown } | undefined)?.ask).trim())
-          out.push({ severity: 'error', message: `“${s.name}” must ask for a reason when “${o.label}” is chosen.` })
+          out.push({
+            severity: 'error',
+            nodeId: s.id,
+            field: 'outcomes',
+            message: `The result “${o.label}” closes the request at “${n.name}”, so fill in “Ask the reviewer for” (e.g. the reason) under Possible results.`,
+          })
     return out
   },
 }

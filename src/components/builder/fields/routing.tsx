@@ -6,9 +6,11 @@ import type { WorkflowNode } from '@/types/workflow'
 /** Lets nested editors (e.g. Condition branches) read and change connections. */
 export interface RoutingApi {
   node: WorkflowNode
-  nodeOptions: { id: string; name: string }[]
+  nodeOptions: { id: string; name: string; usedBy?: string }[]
   /** The other stages an outcome can hand over to */
   stageOptions: { id: string; name: string }[]
+  /** Close request steps: each one may be used by a single result */
+  closeIds?: Set<string>
   setTarget: (outcomeKey: string, targetId: string | null) => void
   setStageTarget: (outcomeKey: string, stageId: string) => void
   createNodeFor: (outcomeKey: string) => void

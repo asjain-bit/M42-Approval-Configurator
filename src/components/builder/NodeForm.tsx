@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, CircleHelp, Copy, Lock, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleAlert, CircleHelp, Copy, Lock, Plus, Trash2, X } from 'lucide-react'
 import { categoryOf, getNodeType, nodeView, slaKind } from '@/lib/registry/nodes'
 import { asArray, customActionsSection, customText, eventNotificationsSection, humanSla, isCustom } from '@/lib/registry/shared'
 import type { SchemaContext, SectionSchema } from '@/lib/registry/types'
 import type { SlaConfig, WorkflowNode } from '@/types/workflow'
+import type { Issue } from '@/lib/workflow/validation'
 import { btnIcon, inputSmall, labelBase, textareaBase } from '@/components/ui/styles'
 import { FieldRenderer } from './fields/FieldRenderer'
 import { RoutingContext, type RoutingApi } from './fields/routing'
@@ -27,6 +28,9 @@ interface Props {
   routing: RoutingApi
   focusField: string | null
   focusTick: number
+  /** Errors to fix in this step; each one points at the field where it is fixed */
+  issues?: Issue[]
+  onGoToIssue?: (issue: Issue) => void
   onChange: (next: WorkflowNode, change: NodeChange) => void
   onDelete: () => void
   onDuplicate: () => void
@@ -85,6 +89,8 @@ export const NodeForm: React.FC<Props> = ({
   routing,
   focusField,
   focusTick,
+  issues = [],
+  onGoToIssue,
   onChange,
   onDelete,
   onDuplicate,
@@ -114,6 +120,19 @@ export const NodeForm: React.FC<Props> = ({
     }, 120)
     return () => clearTimeout(t)
   }, [focusField, focusTick, node.id])
+
+  // Mark every field that has an error so it is clear where each issue is
+  const issueFields = issues.map((i) => i.field).filter(Boolean).join('|')
+  useEffect(() => {
+    const marked = issueFields
+      ? issueFields
+          .split('|')
+          .map((f) => document.getElementById(`field-${f}`))
+          .filter((el): el is HTMLElement => !!el)
+      : []
+    marked.forEach((el) => el.classList.add('field-error'))
+    return () => marked.forEach((el) => el.classList.remove('field-error'))
+  })
 
   const nameTaken = Object.values(ctx.stage.nodes).some(
     (n) => n.id !== node.id && n.name.trim().toLowerCase() === node.name.trim().toLowerCase()
@@ -199,6 +218,25 @@ export const NodeForm: React.FC<Props> = ({
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
+          {/* Issues in this step, each linking to the field where it is fixed */}
+          {issues.length > 0 && (
+            <div className="m-4 mb-1 rounded-xl border border-red-200 bg-red-50 p-3 flex flex-col gap-2" role="alert">
+              <p className="text-xs font-semibold text-red-700 flex items-center gap-1.5">
+                <CircleAlert className="w-4 h-4" aria-hidden="true" /> {issues.length === 1 ? '1 issue' : `${issues.length} issues`} to fix in this step
+              </p>
+              {issues.map((i) => (
+                <button
+                  key={i.id}
+                  className="text-left text-[11px] leading-relaxed text-red-800 hover:underline cursor-pointer"
+                  onClick={() => onGoToIssue?.(i)}
+                >
+                  {i.message.replace(/^Step "[^"]*": /, '').replace(/^"[^"]*": /, '')}
+                  {i.field && <span className="font-semibold"> · Show me</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* To confirm notice */}
           {(node.toConfirm ?? []).length > 0 && (
             <div id="field-toConfirm" className="m-4 mb-1 rounded-xl border border-[#fde8b3] bg-[#fef7e0] p-3 flex flex-col gap-2">

@@ -378,7 +378,17 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
         node: selectedNode,
         nodeOptions: Object.values(stage.nodes)
           .filter((n) => n.id !== selectedNode.id)
-          .map((n) => ({ id: n.id, name: n.name })),
+          .map((n) => {
+            // A Close request step serves one result only; say which result already uses it
+            const user =
+              n.type === 'closeRequest'
+                ? Object.values(stage.nodes)
+                    .filter((s) => s.id !== selectedNode.id)
+                    .flatMap((s) => s.outcomes.filter((o) => o.targetNodeId === n.id).map((o) => ({ s, o })))[0]
+                : undefined
+            return { id: n.id, name: n.name, usedBy: user ? `${user.s.name} → ${user.o.label}` : undefined }
+          }),
+        closeIds: new Set(Object.values(stage.nodes).filter((n) => n.type === 'closeRequest').map((n) => n.id)),
         stageOptions: workflow.stageIds
           .filter((id) => id !== stageId && workflow.stages[id])
           .map((id) => ({ id, name: workflow.stages[id].name })),
@@ -511,6 +521,8 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
                 routing={routing}
                 focusField={focusField}
                 focusTick={focus.tick + (selection?.kind === 'edge' ? 1 : 0)}
+                issues={issues.filter((i) => i.nodeId === selectedNode.id && i.severity === 'error')}
+                onGoToIssue={goToIssue}
                 onChange={updateNode}
                 onDelete={() => setDeletingId(selectedNode.id)}
                 onDuplicate={() => duplicateNode(selectedNode.id)}

@@ -50,11 +50,19 @@ export const ThenGoTo: React.FC<{ outcomeKey: string; label?: string; compact?: 
           }}
         >
           <option value="">Choose the next step…</option>
-          {routing.nodeOptions.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.name}
-            </option>
-          ))}
+          {routing.nodeOptions.map((n) => {
+            // A close step already used by another result can't be shared: each result closes with its own reason
+            const taken =
+              outcome.targetNodeId !== n.id &&
+              (!!n.usedBy ||
+                (!!routing.closeIds?.has(n.id) && routing.node.outcomes.some((o) => o.key !== outcomeKey && o.targetNodeId === n.id)))
+            return (
+              <option key={n.id} value={n.id} disabled={taken}>
+                {n.name}
+                {taken ? ' (already used – add a new step)' : ''}
+              </option>
+            )
+          })}
           <option value={CREATE_NEW}>+ Add a new step…</option>
           {routing.stageOptions.length > 0 && (
             <optgroup label="Move to another stage">

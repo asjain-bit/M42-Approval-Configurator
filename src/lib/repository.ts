@@ -32,7 +32,7 @@ interface Store {
 }
 
 // v9: all six stages rebuilt
-const STORAGE_KEY = 'm42-workflow-configurator.v12'
+const STORAGE_KEY = 'm42-workflow-configurator.v13'
 
 let memory: Store | null = null
 
