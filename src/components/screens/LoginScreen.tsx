@@ -25,7 +25,8 @@ const PORTRAITS = [
   'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=96&h=96&auto=format&fit=crop&q=80',
 ]
 
-const PIPELINE = ['Intake', 'Internal canvas', 'Strategy', 'NDA', 'Due diligence']
+/** Five generic stage cards (no real stage names) */
+const PIPELINE = [0, 1, 2, 3, 4]
 const CARD = { w: 96, h: 62 }
 /** Card positions along a gentle wave, left to right across the panel */
 const SPOTS = [
@@ -53,32 +54,30 @@ const StageCard: React.FC<{ index: number; status: 'done' | 'active' | 'pending'
   return (
     <g transform={`translate(${x} ${y})`} className="login-card" data-status={status}>
       <rect width={CARD.w} height={CARD.h} rx="12" fill="#ffffff" stroke={status === 'active' ? '#36c0c9' : '#e2e8f0'} strokeWidth={status === 'active' ? 1.5 : 1} />
-      <text x="12" y="20" fontSize="9" fontWeight="600" fill="#0f8a93" letterSpacing="0.4">
-        STAGE {index + 1}
-      </text>
-      <text x="12" y="34" fontSize="9.5" fontWeight="600" fill="#334155">
-        {PIPELINE[index]}
-      </text>
+      <rect x="12" y="11" width="16" height="16" rx="5" fill={status === 'pending' ? '#f1f5f9' : '#ddf7f9'} />
+      <rect x="16.5" y="15.5" width="7" height="7" rx="1.5" stroke={status === 'pending' ? '#cbd5e1' : '#36c0c9'} strokeWidth="1.4" />
+      <rect x="34" y="13" width={[44, 36, 40, 30, 42][index]} height="5" rx="2.5" fill={status === 'pending' ? '#e2e8f0' : '#7fd6dc'} />
+      <rect x="34" y="22" width={[28, 34, 24, 32, 26][index]} height="4" rx="2" fill="#eef2f6" />
       {/* Status */}
       <g transform="translate(12 42)">
         {status === 'done' && (
           <>
             <circle cx="6" cy="6" r="6" fill="#22c55e" />
             <path d="M3.4 6.2l1.8 1.8 3.6-3.6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            <text x="16" y="9" fontSize="8.5" fill="#16a34a" fontWeight="600">Completed</text>
+            <rect x="16" y="4" width="34" height="4" rx="2" fill="#bbf7d0" />
           </>
         )}
         {status === 'active' && (
           <>
             <circle cx="6" cy="6" r="5" stroke="#cfe9ec" strokeWidth="2" fill="none" />
             <circle cx="6" cy="6" r="5" stroke="#36c0c9" strokeWidth="2" strokeLinecap="round" strokeDasharray="9 23" fill="none" className="login-spinner" />
-            <text x="16" y="9" fontSize="8.5" fill="#0f8a93" fontWeight="600">Processing</text>
+            <rect x="16" y="4" width="34" height="4" rx="2" fill="#cfe9ec" />
           </>
         )}
         {status === 'pending' && (
           <>
             <circle cx="6" cy="6" r="5" fill="#facc15" />
-            <text x="16" y="9" fontSize="8.5" fill="#a16207" fontWeight="600">Pending</text>
+            <rect x="16" y="4" width="34" height="4" rx="2" fill="#fef08a" />
           </>
         )}
       </g>
@@ -114,8 +113,12 @@ const FlowIllustration: React.FC = () => {
         <circle r="30" fill="#ffffff" fillOpacity="0.55" stroke="#ffffff" />
         <circle r="23" fill="#36c0c9" fillOpacity="0.22" stroke="#ffffff" strokeWidth="1.5" className="login-breathe" />
         <circle r="30" stroke="#36c0c9" strokeWidth="1.5" strokeDasharray="9 13" strokeLinecap="round" className="login-spin" />
-        <g className="login-sparkle">
-          <path d="M0 -12 l3.2 7.6 7.6 3.2 -7.6 3.2 -3.2 7.6 -3.2 -7.6 -7.6 -3.2 7.6 -3.2z" fill="#0f8a93" />
+        {/* Workflow builder: a start node branching to two steps */}
+        <g strokeLinecap="round" strokeLinejoin="round">
+          <path d="M-3 -6 v4 h-6 v4 M-3 -2 h6 v4" stroke="#0f8a93" strokeWidth="1.6" fill="none" />
+          <rect x="-8" y="-14" width="10" height="8" rx="2.5" fill="#0f8a93" />
+          <rect x="-13" y="2" width="9" height="8" rx="2.5" fill="#ffffff" stroke="#0f8a93" strokeWidth="1.6" />
+          <rect x="-1" y="2" width="9" height="8" rx="2.5" fill="#36c0c9" className="login-node-pulse" />
         </g>
       </g>
       <path d={`M264 74 L ${at.x} ${at.y - CARD.h / 2}`} stroke="#7fd6dc" strokeWidth="1.25" strokeDasharray="2 4" style={{ transition: 'd 0.6s ease' }} />
@@ -183,6 +186,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         .login-spin { animation: login-spin 14s linear infinite }
         .login-breathe { animation: login-breathe 3.2s ease-in-out infinite }
         .login-sparkle { animation: login-sparkle 3.2s ease-in-out infinite }
+        @keyframes login-node-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+        .login-node-pulse { animation: login-node-pulse 1.6s ease-in-out infinite }
         .login-twinkle { animation: login-twinkle 2.8s ease-in-out infinite }
         .login-twinkle-late { animation: login-twinkle 2.8s ease-in-out 1.4s infinite }
         @keyframes login-spinner { to { transform: rotate(360deg) } }
@@ -190,7 +195,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         @keyframes login-pop { from { opacity: .6; transform: translateY(2px) } to { opacity: 1; transform: none } }
         .login-card > g { animation: login-pop .35s ease-out }
         @media (prefers-reduced-motion: reduce) {
-          .login-float, .login-float-slow, .login-dash, .login-spin, .login-breathe, .login-sparkle, .login-twinkle, .login-twinkle-late { animation: none }
+          .login-float, .login-float-slow, .login-dash, .login-spin, .login-breathe, .login-sparkle, .login-twinkle, .login-twinkle-late, .login-node-pulse { animation: none }
         }
       `}</style>
 
