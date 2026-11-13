@@ -1,16 +1,14 @@
 'use client'
 
 import React from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Info, Plus, Trash2 } from 'lucide-react'
 import { newId } from '@/lib/id'
-import { TEMPLATES } from '@/lib/library'
+import { findRole, findTeam, findUser, TEMPLATES } from '@/lib/library'
 import type { CaseField, Reminder, SlaConfig, Stage, WorkflowNode } from '@/types/workflow'
 import { btnIcon, btnLink, helpText, inputSmall, labelBase } from '@/components/ui/styles'
 import { BreachActionEditor } from './BreachActionEditor'
 import { EmailPreview } from './EmailPreview'
-import { RecipientsEditor } from './RecipientsEditor'
 import { Toggle } from './fields/Toggle'
-import { Radio } from '@/components/ui/Choice'
 
 interface Props {
   node: WorkflowNode
@@ -37,6 +35,8 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
   const set = (patch: Partial<SlaConfig>, what: string) => onChange({ ...sla, ...patch }, what)
   const setReminder = (i: number, patch: Partial<Reminder>) =>
     set({ reminders: sla.reminders.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) }, 'Reminders')
+  const a = String(node.config.assignee ?? '')
+  const assignee = a === 'vendor' ? 'Vendor' : (findRole(a)?.name ?? findTeam(a)?.name ?? findUser(a)?.name ?? 'The person doing this step')
   const durationMissing = sla.enabled && (sla.duration.value === null || !(sla.duration.value > 0))
 
   return (
@@ -60,7 +60,19 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
       {sla.enabled && (
         <>
           <div>
-            <label className={labelBase}>{agent ? 'Stop the agent after' : 'Deadline'}</label>
+            <label className={`${labelBase} flex items-center gap-1`}>
+              {agent ? 'Stop the agent after' : 'Deadline'}
+              {!agent && (
+                <span
+                  tabIndex={0}
+                  className="text-[#94a3b8] hover:text-[#0f8a93] cursor-help"
+                  title="The deadline is counted from the moment this step starts."
+                  aria-label="The deadline is counted from the moment this step starts."
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </span>
+              )}
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -87,25 +99,6 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
             </div>
             {durationMissing && <p className="text-[11px] text-red-600 mt-1">Set how long they have.</p>}
           </div>
-
-          {!agent && (
-            <div>
-              <label className={labelBase}>Count the deadline from</label>
-              <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Clock starts">
-                {(
-                  [
-                    ['onStepStart', 'When the step starts'],
-                    ['onAssignment', 'When someone is assigned'],
-                  ] as const
-                ).map(([v, l]) => (
-                  <label key={v} className="flex items-center gap-2 text-xs cursor-pointer">
-                    <Radio checked={sla.clockStarts === v} onChange={() => set({ clockStarts: v }, 'Clock starts')} />
-                    {l}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
           {!agent && (
             <div className="flex flex-col gap-2">
@@ -162,7 +155,8 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                   <p className="text-[11px] text-[#64748b]">Sent by email.</p>
                   <div>
                     <span className={labelBase}>Send to</span>
-                    <RecipientsEditor value={r.recipients} onChange={(recipients) => setReminder(i, { recipients })} caseFields={caseFields} />
+                    {/* A reminder always goes to whoever is doing this step */}
+                    <p className="text-xs text-[#0d212c] rounded-lg bg-slate-50 border border-[#e2e8f0] px-3 py-2">{assignee}</p>
                   </div>
                   <div>
                     <label className={labelBase}>Email template</label>

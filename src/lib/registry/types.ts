@@ -42,6 +42,7 @@ export type FieldKind =
   | 'number'
   | 'time'
   | 'toggle'
+  | 'checkbox'
   | 'select'
   | 'radio'
   | 'multiselect'

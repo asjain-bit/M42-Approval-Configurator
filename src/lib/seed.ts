@@ -5,7 +5,7 @@
  */
 
 import { newId } from '@/lib/id'
-import type { AuditEntry, BreachAction, Recipient, Reminder, SlaConfig, Stage, Workflow, WorkflowNode, WorkflowVersion } from '@/types/workflow'
+import type { AuditEntry, Recipient, Reminder, SlaConfig, Stage, Workflow, WorkflowNode, WorkflowVersion } from '@/types/workflow'
 import { getNodeType } from '@/lib/registry/nodes'
 import { createNode, newStage, normalizeStage, syncOutcomes } from '@/lib/workflow/graph'
 import { stepPrompt } from '@/lib/library'
@@ -36,28 +36,27 @@ const reminder = (days: number): Reminder => ({
 })
 
 
-const sla = (days: number | null, reminders: Reminder[] = [], breachIn: BreachAction | null = null): SlaConfig => {
-  const breach = breachIn
-  return {
-    enabled: true,
-    duration: { value: days, unit: 'businessDays' },
-    clockStarts: 'onStepStart',
-    reminders,
-    breachAction: breach,
-  }
-}
+/** A person's deadline: if it is missed, the request is marked At Risk */
+const sla = (days: number | null, reminders: Reminder[] = []): SlaConfig => ({
+  enabled: true,
+  duration: { value: days, unit: 'businessDays' },
+  clockStarts: 'onStepStart',
+  reminders,
+  breachAction: { kind: 'markAtRisk' },
+})
 
-/** Reminders go to the step's role or team by name (reminders don't offer "this step's assignees") */
-const remindAssignee = (sla: SlaConfig, assignee: string, person?: string): SlaConfig => {
-  const who: Recipient | null = person
-    ? { kind: 'user', userId: person }
-    : assignee.startsWith('role-')
+/** Reminders go to whoever does the step: its role or team */
+const remindAssignee = (sla: SlaConfig, assignee: string): SlaConfig => {
+  const who: Recipient | null = assignee.startsWith('role-')
       ? { kind: 'role', roleId: assignee }
       : assignee.startsWith('team-')
         ? { kind: 'team', teamId: assignee }
         : null
   return { ...sla, reminders: sla.reminders.map((r) => ({ ...r, recipients: who ? [who] : r.recipients })) }
 }
+
+/** Outcome target meaning "move on to the next stage" (no Stage complete step); filled in by seedWorkflow */
+const NEXT_STAGE = '@nextStage'
 
 /** Build a stage from specs, wiring outcomes by label → ref. Optional hand-placed positions (by ref) replace auto-layout. */
 function buildStage(name: string, description: string, specs: Spec[], positions?: Record<string, { x: number; y: number }>): Stage {
@@ -71,7 +70,7 @@ function buildStage(name: string, description: string, specs: Spec[], positions?
       name: s.name,
       description: s.description ?? '',
       config: { ...base.config, ...(s.config ?? {}) },
-      ...(s.sla ? { sla: remindAssignee(s.sla, String(s.config?.assignee ?? ''), s.config?.assigneeUser as string | undefined) } : {}),
+      ...(s.sla ? { sla: remindAssignee(s.sla, String(s.config?.assignee ?? '')) } : {}),
       ...(s.toConfirm ? { toConfirm: s.toConfirm } : {}),
     })
     stage.nodes[node.id] = node
@@ -84,11 +83,12 @@ function buildStage(name: string, description: string, specs: Spec[], positions?
       ...node,
       outcomes: node.outcomes.map((o) => {
         const ref = s.to?.[o.label] ?? s.to?.[o.key]
+        if (ref === NEXT_STAGE) return { ...o, targetStageId: NEXT_STAGE }
         return ref ? { ...o, targetNodeId: ids[ref] } : o
       }),
     }
   }
-  if (positions) stage.layout = Object.fromEntries(Object.entries(positions).map(([ref, p]) => [ids[ref], p]))
+  if (positions) stage.layout = Object.fromEntries(Object.entries(positions).filter(([ref]) => ids[ref]).map(([ref, p]) => [ids[ref], p]))
   return normalizeStage(stage)
 }
 
@@ -122,13 +122,13 @@ function stage1(): Stage {
       name: 'Vendor web form',
       description: 'Vendor fills in the partnership form.',
       config: { formId: 'vendor-intake-form', submitters: 'vendors' },
-      to: { Submitted: 'agent', Exited: 'notSubmitted' },
+      to: { Submitted: 'agent', Cancel: 'notSubmitted' },
     },
     {
       ref: 'notSubmitted',
       type: 'closeRequest',
       name: 'Request closed',
-      config: { statusLabel: 'Request closed – vendor exited the form', reasonMode: 'optional', reasonSource: 'fixed', reason: 'The vendor exited the form', emailVendor: false },
+      config: { statusLabel: 'Request closed – vendor cancelled the form', reasonMode: 'none', reasonSource: 'fixed', reason: '', emailVendor: false },
     },
     {
       ref: 'agent',
@@ -167,7 +167,7 @@ function stage1(): Stage {
           { id: newId('opt'), label: 'Reject', ask: 'Reason for rejection' },
         ],
       },
-      sla: sla(2, [reminder(1)], { kind: 'escalate', to: [{ kind: 'user', userId: 'u13' }] }),
+      sla: sla(2, [reminder(1)]),
       to: { Approve: 'type', Reject: 'rejectedAdmin' },
     },
     {
@@ -206,8 +206,8 @@ function stage1(): Stage {
           { id: newId('opt'), label: 'Request more info', ask: 'What the vendor needs to provide' },
         ],
       },
-      sla: sla(6, [reminder(5)], { kind: 'escalate', to: [{ kind: 'user', userId: 'u14' }] }),
-      to: { Proceed: 'next', Reject: 'rejectedDirector', 'Request more info': 'waiting' },
+      sla: sla(6, [reminder(5)]),
+      to: { Proceed: NEXT_STAGE, Reject: 'rejectedDirector', 'Request more info': 'waiting' },
     },
     {
       ref: 'rejectedDirector',
@@ -222,7 +222,6 @@ function stage1(): Stage {
       config: { reason: 'Waiting for vendor information', canResume: true },
       to: { Resumed: 'director' },
     },
-    { ref: 'next', type: 'stageComplete', name: 'Stage complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }
 
@@ -241,7 +240,6 @@ export function internalCanvasStage(): Stage {
     fn: 'countWhere' as const,
     where: { left: { kind: 'caseField' as const, key: 'response' }, operator: 'is' as const, value: SPONSOR },
   })
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
 
   return buildStage(
     'Internal Canvas',
@@ -285,7 +283,7 @@ export function internalCanvasStage(): Stage {
           outcomes: options('Request sent'),
         },
         configFn: (ids) => ({ peopleFrom: ids.agent }),
-        sla: sla(2, [reminder(1)], escalate),
+        sla: sla(2, [reminder(1)]),
         to: { 'Request sent': 'collect' },
       },
       {
@@ -300,7 +298,7 @@ export function internalCanvasStage(): Stage {
           responseOptions: options(SPONSOR, 'Interested, not sponsoring', 'Not interested'),
           completion: 'everyone',
           deadline: { value: 5, unit: 'businessDays' },
-          onDeadline: 'evaluate',
+          onDeadline: 'atRisk',
           reminderOn: true,
           reminderAfter: { value: 3, unit: 'businessDays' },
         },
@@ -361,7 +359,7 @@ export function internalCanvasStage(): Stage {
           instructions: 'Review the answers and close the request, giving the reason.',
           outcomes: [{ id: newId('opt'), label: 'Close the request', ask: 'Reason for closing' }],
         },
-        sla: sla(3, [reminder(2)], escalate),
+        sla: sla(3, [reminder(2)]),
         to: { 'Close the request': 'closeNoSponsor' },
       },
       {
@@ -376,7 +374,7 @@ export function internalCanvasStage(): Stage {
         name: 'Make them the sponsor',
         description: 'The one person who is ready to sponsor becomes the sponsor of the case.',
         config: { actor: 'system', action: 'custom', customAction: 'Set the responder as the sponsor', outcomes: options('Sponsor set') },
-        to: { 'Sponsor set': 'complete' },
+        to: { 'Sponsor set': NEXT_STAGE },
       },
       {
         ref: 'select',
@@ -402,7 +400,7 @@ export function internalCanvasStage(): Stage {
           chooseFrom: ids.collect,
           chooseOnly: (stage.nodes[ids.collect].config.responseOptions as { id: string; label: string }[]).find((o) => o.label === SPONSOR)?.id,
         }),
-        sla: sla(3, [reminder(2)], escalate),
+        sla: sla(3, [reminder(2)]),
         to: { 'Sponsors selected': 'split' },
       },
       {
@@ -411,13 +409,7 @@ export function internalCanvasStage(): Stage {
         name: 'Create split cases',
         description: 'A copy of the case is made for each co-sponsor so they can follow it on their own.',
         config: { actor: 'system', action: 'custom', customAction: 'Create a split case for each co-sponsor', outcomes: options('Split cases created') },
-        to: { 'Split cases created': 'complete' },
-      },
-      {
-        ref: 'complete',
-        type: 'stageComplete',
-        name: 'Stage complete',
-        config: { unlock: 'next', statusLabel: 'Completed', condition: 'The sponsor (and any co-sponsors) is confirmed', waitForAll: false },
+        to: { 'Split cases created': NEXT_STAGE },
       },
     ],
     {
@@ -442,7 +434,6 @@ export function internalCanvasStage(): Stage {
  * writes the pre-read, and the team proceeds or rejects.
  */
 function strategicAlignmentStage(): Stage {
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
   return buildStage('Strategic Alignment', 'The strategy team reads the AI pre-read and decides whether the request goes ahead.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'send' } },
     {
@@ -461,7 +452,7 @@ function strategicAlignmentStage(): Stage {
         instructions: 'Check the strategy team list and send the request.',
         outcomes: options('Request sent'),
       },
-      sla: sla(2, [reminder(1)], escalate),
+      sla: sla(2, [reminder(1)]),
       to: { 'Request sent': 'preRead' },
     },
     {
@@ -496,11 +487,10 @@ function strategicAlignmentStage(): Stage {
           { id: newId('opt'), label: 'Reject', ask: 'Reason for rejection' },
         ],
       },
-      sla: sla(4, [reminder(3)], escalate),
-      to: { Proceed: 'complete', Reject: 'rejected' },
+      sla: sla(4, [reminder(3)]),
+      to: { Proceed: NEXT_STAGE, Reject: 'rejected' },
     },
     { ref: 'rejected', type: 'closeRequest', name: 'Request closed – by strategy team', config: rejectAndEmail('Request closed – by strategy team') },
-    { ref: 'complete', type: 'stageComplete', name: 'Stage complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }
 
@@ -508,7 +498,6 @@ function strategicAlignmentStage(): Stage {
  * Stage 4 – NDA: the director confirms the vendor signed the NDA and uploads it, then an agent builds the alignment pack.
  */
 function ndaStage(): Stage {
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
   return buildStage('NDA', 'The director uploads the signed NDA, then the agent builds the alignment pack.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'upload' } },
     {
@@ -527,7 +516,7 @@ function ndaStage(): Stage {
         instructions: 'Confirm the vendor has signed the NDA, then upload the signed copy.',
         outcomes: options('NDA uploaded'),
       },
-      sla: sla(10, [reminder(7)], escalate),
+      sla: sla(10, [reminder(7)]),
       to: { 'NDA uploaded': 'pack' },
     },
     {
@@ -543,9 +532,8 @@ function ndaStage(): Stage {
         tasks: [],
         outcomes: options('Alignment pack ready'),
       },
-      to: { 'Alignment pack ready': 'complete' },
+      to: { 'Alignment pack ready': NEXT_STAGE },
     },
-    { ref: 'complete', type: 'stageComplete', name: 'Stage complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }
 
@@ -554,7 +542,6 @@ function ndaStage(): Stage {
  * the agent summarises it, and the director proceeds or rejects.
  */
 function discoveryCallStage(): Stage {
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u14' }] }
   return buildStage('Discovery Call', 'The director confirms the discovery call, the agent summarises it, and the director decides.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'confirm' } },
     {
@@ -570,11 +557,11 @@ function discoveryCallStage(): Stage {
         approvers: 1,
         acknowledgement: 'The discovery call has been completed',
         documentName: 'Call transcript or recording',
-        uploadOptional: true,
+        uploadRequired: false,
         instructions: 'Confirm the discovery call is done. Upload the transcript or recording if you have it.',
         outcomes: options('Continue'),
       },
-      sla: sla(10, [reminder(7)], escalate),
+      sla: sla(10, [reminder(7)]),
       to: { Continue: 'summary' },
     },
     {
@@ -607,11 +594,10 @@ function discoveryCallStage(): Stage {
           { id: newId('opt'), label: 'Reject', ask: 'Reason for rejection' },
         ],
       },
-      sla: sla(3, [reminder(2)], escalate),
-      to: { Proceed: 'complete', Reject: 'rejected' },
+      sla: sla(3, [reminder(2)]),
+      to: { Proceed: NEXT_STAGE, Reject: 'rejected' },
     },
     { ref: 'rejected', type: 'closeRequest', name: 'Request closed – after discovery call', config: rejectAndEmail('Request closed – after discovery call') },
-    { ref: 'complete', type: 'stageComplete', name: 'Stage complete', config: { unlock: 'next', statusLabel: 'Completed' } },
   ])
 }
 
@@ -622,7 +608,6 @@ function discoveryCallStage(): Stage {
  */
 function valueStage(): Stage {
   const SPONSOR_ROLE = 'role-sponsor'
-  const escalate = { kind: 'escalate' as const, to: [{ kind: 'user' as const, userId: 'u13' }] }
   return buildStage('Value & Due Diligence', 'The sponsor builds the business case, the TDD admin completes the assessments, and the sponsor makes the final call.', [
     { ref: 'start', type: 'stageStart', name: 'Stage start', config: { startsWhen: 'previousStage' }, to: { Start: 'business' } },
     {
@@ -637,11 +622,11 @@ function valueStage(): Stage {
         approvers: 1,
         acknowledgement: 'The value assessment call has been completed',
         documentName: 'Business case',
-        uploadOptional: false,
+        uploadRequired: true,
         instructions: 'Confirm the value assessment call is done and upload the business case.',
         outcomes: options('Business case uploaded'),
       },
-      sla: sla(10, [reminder(7)], escalate),
+      sla: sla(10, [reminder(7)]),
       to: { 'Business case uploaded': 'valueSummary' },
     },
     {
@@ -673,7 +658,7 @@ function valueStage(): Stage {
           { id: newId('opt'), label: 'Reject', ask: 'Reason for rejection' },
         ],
       },
-      sla: sla(5, [reminder(3)], escalate),
+      sla: sla(5, [reminder(3)]),
       to: { 'Proceed to sponsor': 'tdd', Reject: 'rejectedValue' },
     },
     { ref: 'rejectedValue', type: 'closeRequest', name: 'Request closed – by sponsor', config: rejectAndEmail('Request closed – by sponsor') },
@@ -691,7 +676,7 @@ function valueStage(): Stage {
         instructions: 'Mark every technical due diligence assessment as complete.',
         outcomes: options('All assessments completed'),
       },
-      sla: sla(10, [reminder(7)], escalate),
+      sla: sla(10, [reminder(7)]),
       to: { 'All assessments completed': 'report' },
     },
     {
@@ -723,7 +708,7 @@ function valueStage(): Stage {
           { id: newId('opt'), label: 'Do not sponsor', ask: 'Reason for not sponsoring' },
         ],
       },
-      sla: sla(5, [reminder(3)], escalate),
+      sla: sla(5, [reminder(3)]),
       to: { Sponsor: 'complete', 'Do not sponsor': 'rejectedFinal' },
     },
     { ref: 'rejectedFinal', type: 'closeRequest', name: 'Request closed – not sponsored', config: rejectAndEmail('Request closed – not sponsored') },
@@ -733,6 +718,11 @@ function valueStage(): Stage {
 
 export function seedWorkflow(): Workflow {
   const stages = [stage1(), internalCanvasStage(), strategicAlignmentStage(), ndaStage(), discoveryCallStage(), valueStage()]
+  // Results that finish a stage hand the request straight to the next stage
+  stages.forEach((stage, i) => {
+    for (const node of Object.values(stage.nodes))
+      node.outcomes = node.outcomes.map((o) => (o.targetStageId === NEXT_STAGE ? { ...o, targetStageId: stages[i + 1]?.id } : o))
+  })
   return {
     id: newId('wf'),
     name: 'Tech Due Diligence Workflow Management',
@@ -804,7 +794,7 @@ export function seedHistory(wf: Workflow): { workflow: Workflow; audit: AuditEnt
             stageId,
             objectPath: `${stage.name} › ${node.name} › Deadline`,
             before: 'No deadline',
-            after: `${node.sla.duration.value} business days, then escalate`,
+            after: `${node.sla.duration.value} business days, then mark At Risk`,
           },
           ADMIN_USER,
           3

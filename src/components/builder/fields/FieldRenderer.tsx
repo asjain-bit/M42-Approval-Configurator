@@ -237,6 +237,16 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
           {field.help && <p className={helpText}>{field.help}</p>}
         </div>
       )
+    case 'checkbox':
+      return (
+        <div id={id} className={`py-0.5 ${highlighted ? 'field-flash' : ''}`}>
+          <label className="flex items-center gap-2 text-xs text-[#0d212c] cursor-pointer">
+            <input type="checkbox" className="w-4 h-4 accent-[#36c0c9] cursor-pointer" checked={!!value} onChange={(e) => set(e.target.checked)} />
+            {field.label}
+          </label>
+          {field.help && <p className={helpText}>{field.help}</p>}
+        </div>
+      )
     case 'select':
       control = (
         <CustomSelect

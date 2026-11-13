@@ -157,7 +157,7 @@ const formSubmission: NodeTypeDef = {
     formId: '',
     submitters: 'vendors',
     confirmationMessage: 'Thank you. Your request has been submitted.',
-    outcomes: itemsOf(['Submitted', 'Exited']),
+    outcomes: itemsOf(['Submitted', 'Cancel']),
   }),
   configSchema: [
     {
@@ -175,7 +175,7 @@ const formSubmission: NodeTypeDef = {
           key: 'outcomes',
           label: 'Results of this step',
           kind: 'list',
-          help: 'Name each way the form can end, for example "Submitted" and "Exited". In the next section you choose where each result leads.',
+          help: 'Name each way the form can end, for example "Submitted" and "Cancel". In the next section you choose where each result leads.',
           minItems: 1,
           addLabel: 'Add result',
           newItem: () => newItem(),
@@ -186,7 +186,7 @@ const formSubmission: NodeTypeDef = {
     },
   ],
   getOutcomes: (n) => itemOutcomes(n.config.outcomes, 'Result'),
-  outcomesNote: 'If the vendor exits, nothing is submitted: send "Exited" to a Close request so the request ends.',
+  outcomesNote: 'If the vendor cancels, nothing is submitted: send "Cancel" to a Close request so the request ends.',
   summary: (n) => nameOf(n.config.formId, findForm) ?? 'No form selected',
   outputs: (n) => {
     const form = findForm(n.config.formId)
@@ -767,10 +767,10 @@ const step: NodeTypeDef = {
           showIf: is('human', 'upload'),
         },
         {
-          key: 'uploadOptional',
-          label: 'They can skip the upload',
-          kind: 'toggle',
-          help: 'Turn on when the document is nice to have, for example a call recording.',
+          key: 'uploadRequired',
+          label: 'Upload is required',
+          kind: 'checkbox',
+          help: 'Tick to make the upload required. Leave it unticked when the document is nice to have, for example a call recording.',
           showIf: is('human', 'upload'),
         },
         {
@@ -1436,6 +1436,7 @@ const collectResponses: NodeTypeDef = {
           options: opt([
             ['evaluate', 'Carry on with the responses received so far'],
             ['separate', 'Take a separate "Deadline reached" path'],
+            ['atRisk', 'Update the status to At Risk'],
           ]),
         },
         { key: 'reminderOn', label: 'Remind people who have not responded', kind: 'toggle' },
