@@ -13,6 +13,8 @@ export interface RoutingApi {
   setStageTarget: (outcomeKey: string, stageId: string) => void
   createNodeFor: (outcomeKey: string) => void
   focusField?: string | null
+  /** Mandatory fields still empty; while any are listed, the next step can't be chosen */
+  missing?: string[]
 }
 
 export const RoutingContext = createContext<RoutingApi | null>(null)

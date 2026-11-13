@@ -8,6 +8,7 @@ import { CUSTOM_PREFIX, customText, isCustom } from '@/lib/registry/shared'
 import type { DurationUnit, Recipient } from '@/types/workflow'
 import { btnIcon, btnLink, helpText, inputSmall, labelBase, textareaBase } from '@/components/ui/styles'
 import { RecipientsEditor } from '../RecipientsEditor'
+import { EmailPreview } from '../EmailPreview'
 import { BranchesEditor } from './BranchesEditor'
 import { SetRowsEditor, type SetRow } from './SetRowsEditor'
 import { Toggle } from './Toggle'
@@ -35,6 +36,88 @@ function grouped(options: OptionItem[]) {
 }
 
 const CUSTOM_CHOICE = '__custom__'
+
+/** Values admins added themselves for this field anywhere in the workflow, so they can be picked again like any other option */
+function customOptions(key: string, ctx: SchemaContext, current: unknown): OptionItem[] {
+  const seen = new Set<string>()
+  for (const st of Object.values(ctx.workflow.stages))
+    for (const n of Object.values(st.nodes)) {
+      const v = getPath(n.config, key)
+      if (isCustom(v) && customText(v)) seen.add(v)
+    }
+  if (isCustom(current) && customText(current)) seen.add(current)
+  return [...seen].map((v) => ({ value: v, label: customText(v), group: 'Added manually' }))
+}
+
+/**
+ * CustomSelect — Molecule
+ * Dropdown whose "+ Add your own…" opens an input; once added, the new value joins the list and is selected.
+ */
+const CustomSelect: React.FC<{
+  id?: string
+  field: FieldSchema
+  value: unknown
+  options: OptionItem[]
+  errorRing: string
+  onChange: (v: unknown) => void
+}> = ({ id, field, value, options, errorRing, onChange }) => {
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+  // Older data may hold an unfinished "custom:" value: treat it as still being typed
+  const pending = isCustom(value) && !customText(value)
+  const known = !value || pending || options.some((o) => o.value === value)
+  const add = () => {
+    const text = draft.trim()
+    if (!text) return
+    onChange(CUSTOM_PREFIX + text)
+    setAdding(false)
+    setDraft('')
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <select
+        id={id}
+        className={`${inputSmall} ${errorRing}`}
+        value={adding || pending ? CUSTOM_CHOICE : String(value ?? '')}
+        onChange={(e) => {
+          if (e.target.value === CUSTOM_CHOICE) return setAdding(true)
+          setAdding(false)
+          onChange(e.target.value === '' ? '' : e.target.value)
+        }}
+      >
+        <option value="">{field.placeholder ?? 'Choose…'}</option>
+        {!known && <option value={String(value)}>No longer available</option>}
+        <OptionList options={options} />
+        {field.allowCustom && <option value={CUSTOM_CHOICE}>+ Add your own…</option>}
+      </select>
+      {(adding || pending) && (
+        <div className="flex items-center gap-2">
+          <input
+            aria-label={`${field.label}: your own`}
+            className={inputSmall}
+            value={draft}
+            maxLength={80}
+            placeholder={`New ${field.label.toLowerCase()}`}
+            autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') add()
+              if (e.key === 'Escape') setAdding(false)
+            }}
+          />
+          <button
+            type="button"
+            className="h-8 px-3 rounded-lg bg-[#36c0c9] text-white text-xs font-semibold disabled:opacity-40 cursor-pointer shrink-0"
+            disabled={!draft.trim()}
+            onClick={add}
+          >
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const OptionList: React.FC<{ options: OptionItem[] }> = ({ options }) => (
   <>
@@ -114,7 +197,8 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
         <>
           <textarea
             id={inputId}
-            className={`${textareaBase} text-xs ${errorRing}`}
+            className={`${textareaBase} text-xs ${errorRing} ${field.rows ? '[field-sizing:content] !max-h-none' : ''}`}
+            rows={field.rows}
             value={String(value ?? '')}
             placeholder={field.placeholder}
             maxLength={field.maxLength}
@@ -152,37 +236,25 @@ export const FieldRenderer: React.FC<Props> = ({ field, scope, ctx, onChange, an
           {field.help && <p className={helpText}>{field.help}</p>}
         </div>
       )
-    case 'select': {
-      const custom = isCustom(value)
-      const known = !value || custom || options.some((o) => o.value === value)
+    case 'select':
       control = (
-        <div className="flex flex-col gap-2">
-          <select
-            id={inputId}
-            className={`${inputSmall} ${errorRing}`}
-            value={custom ? CUSTOM_CHOICE : String(value ?? '')}
-            onChange={(e) => set(e.target.value === CUSTOM_CHOICE ? CUSTOM_PREFIX : e.target.value)}
-          >
-            <option value="">{field.placeholder ?? 'Choose…'}</option>
-            {!known && <option value={String(value)}>No longer available</option>}
-            <OptionList options={options} />
-            {field.allowCustom && <option value={CUSTOM_CHOICE}>+ Add your own…</option>}
-          </select>
-          {custom && (
-            <input
-              aria-label={`${field.label}: your own`}
-              className={`${inputSmall} ${errorRing}`}
-              value={customText(value)}
-              maxLength={80}
-              placeholder="Type your own"
-              autoFocus={customText(value) === ''}
-              onChange={(e) => set(CUSTOM_PREFIX + e.target.value)}
-            />
-          )}
-        </div>
+        <CustomSelect
+          id={inputId}
+          field={field}
+          value={value}
+          options={field.allowCustom ? [...options, ...customOptions(field.key, ctx, value)] : options}
+          errorRing={errorRing}
+          onChange={set}
+        />
       )
+      if (field.emailKey)
+        control = (
+          <div className="flex flex-col gap-3">
+            {control}
+            <EmailPreview templateId={value} override={getPath(scope, field.emailKey)} onChange={(o) => onChange(field.emailKey!, o)} />
+          </div>
+        )
       break
-    }
     case 'caseFieldSelect': {
       const known = !value || options.some((o) => o.value === value)
       control = (
@@ -395,7 +467,8 @@ const ListEditor: React.FC<{
   ctx: SchemaContext
   onChange: (items: Record<string, unknown>[]) => void
 }> = ({ field, items, ctx, onChange }) => {
-  const [open, setOpen] = useState<Record<number, boolean>>({})
+  // Items start open so everything that needs filling in is visible
+  const [shut, setShut] = useState<Record<number, boolean>>({})
   const schema = field.itemSchema ?? []
   const simple = schema.length === 1 && schema[0].kind === 'text'
   const update = (i: number, path: string, v: unknown) =>
@@ -423,10 +496,10 @@ const ListEditor: React.FC<{
             <div className="flex items-center gap-1 px-2 py-1.5">
               <button
                 className="flex-1 flex items-center gap-1.5 text-left text-xs font-semibold text-[#0d212c] py-1 px-1 cursor-pointer min-w-0"
-                aria-expanded={!!open[i]}
-                onClick={() => setOpen((o) => ({ ...o, [i]: !o[i] }))}
+                aria-expanded={!shut[i]}
+                onClick={() => setShut((o) => ({ ...o, [i]: !o[i] }))}
               >
-                {open[i] ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+                {!shut[i] ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
                 <span className="truncate">{field.itemTitle?.(item, i) ?? `${field.label} ${i + 1}`}</span>
               </button>
               <button
@@ -462,7 +535,7 @@ const ListEditor: React.FC<{
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-            {open[i] && (
+            {!shut[i] && (
               <div className="px-3 pb-3 pt-1 flex flex-col gap-3 border-t border-[#f1f5f9]">
                 {schema.map((f) => (
                   <FieldRenderer key={f.key} field={f} scope={item} ctx={ctx} onChange={(p, v) => update(i, p, v)} />
@@ -478,7 +551,7 @@ const ListEditor: React.FC<{
           className={`${btnLink} self-start`}
           onClick={() => {
             onChange([...items, field.newItem!()])
-            setOpen((o) => ({ ...o, [items.length]: true }))
+            setShut((o) => ({ ...o, [items.length]: false }))
           }}
         >
           <Plus className="w-3.5 h-3.5" /> {field.addLabel ?? 'Add'}

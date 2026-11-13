@@ -130,3 +130,8 @@ select {
   background-size: 1rem 1rem;
   text-overflow: ellipsis;
 }
+
+/* A hovered step sits above its neighbours so its issue list is never hidden */
+.react-flow__node:hover {
+  z-index: 1000 !important;
+}

@@ -116,6 +116,8 @@ const assigneeOptions = (): OptionItem[] => [
   ...teamOptions().map((o) => ({ ...o, group: 'Teams' })),
   ...userOptions().map((o) => ({ ...o, group: 'People' })),
 ]
+/** A team can hold several people; a role names one person (picked below it), as does a person or the vendor */
+const isGroup = (id: unknown) => !!findTeam(id) || isCustom(id)
 const assigneeName = (id: unknown) =>
   isCustom(id) ? customText(id) : id === 'vendor' ? 'Vendor' : (findRole(id)?.name ?? findTeam(id)?.name ?? findUser(id)?.name)
 /** Name of a library item, or the text the admin typed in themselves */
@@ -127,6 +129,12 @@ const START_LOOK = {
   accent: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   cardTone: 'bg-emerald-50 border-emerald-300',
   mapColor: '#10b981',
+}
+/** A finished stage is good news: its own indigo, not the red of endings or the blue of people's steps */
+const DONE_LOOK = {
+  accent: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+  cardTone: 'bg-indigo-50 border-indigo-300',
+  mapColor: '#6366f1',
 }
 const END_LOOK = {
   accent: 'bg-red-50 text-red-600 border-red-200',
@@ -141,15 +149,15 @@ const formSubmission: NodeTypeDef = {
   category: 'startEnd',
   label: 'Form submission',
   icon: FileInput,
-  description: 'The vendor fills in a form, which opens the case.',
+  description: 'The vendor fills in a form. Submitting opens the case; cancelling ends it.',
   ...START_LOOK,
-  isStart: true,
   shape: 'pill',
   defaultName: 'Vendor submits the form',
   defaultConfig: () => ({
     formId: '',
     submitters: 'vendors',
     confirmationMessage: 'Thank you. Your request has been submitted.',
+    outcomes: itemsOf(['Submitted', 'Cancelled']),
   }),
   configSchema: [
     {
@@ -169,8 +177,26 @@ const formSubmission: NodeTypeDef = {
         { key: 'confirmationMessage', label: 'Message shown after submitting', kind: 'textarea', maxLength: 300 },
       ],
     },
+    {
+      id: 'outcomes',
+      title: 'Step 1 · Possible results',
+      fields: [
+        {
+          key: 'outcomes',
+          label: 'Results of this step',
+          kind: 'list',
+          help: 'Name each way the form can end, for example "Submitted" and "Cancelled". In the next section you choose where each result leads.',
+          minItems: 1,
+          addLabel: 'Add result',
+          newItem: () => newItem(),
+          itemTitle: (item, i) => `Result ${i + 1}${asString(item.label) ? `: ${asString(item.label)}` : ''}`,
+          itemSchema: [{ key: 'label', label: 'Result name', kind: 'text', required: true, placeholder: 'e.g. Submitted' }],
+        },
+      ],
+    },
   ],
-  getOutcomes: () => [{ key: 'submitted', label: 'Submitted' }],
+  getOutcomes: (n) => itemOutcomes(n.config.outcomes, 'Result'),
+  outcomesNote: 'If the vendor cancels, nothing is submitted: send "Cancelled" to a Close request so the request ends.',
   summary: (n) => nameOf(n.config.formId, findForm) ?? 'No form selected',
   outputs: (n) => {
     const form = findForm(n.config.formId)
@@ -179,8 +205,8 @@ const formSubmission: NodeTypeDef = {
   isAllowed: ({ workflow, stage }) =>
     workflow.stageIds[0] !== stage.id
       ? { allowed: false, reason: 'Only the first stage can start with a form.' }
-      : hasStart(stage)
-        ? { allowed: false, reason: 'This stage already has a start.' }
+      : Object.values(stage.nodes).some((n) => n.type === 'formSubmission')
+        ? { allowed: false, reason: 'This stage already has a form submission.' }
         : { allowed: true },
   validate: (_node, ctx) =>
     ctx.workflow.stageIds[0] !== ctx.stage.id
@@ -212,8 +238,15 @@ const stageStart: NodeTypeDef = {
   defaultConfig: () => ({ startsWhen: 'previousStage', stageId: '', event: 'vendorSubmits', eventText: '' }),
   configSchema: [
     {
+      id: 'firstStart',
+      title: 'Start',
+      showIf: (_c, ctx) => ctx.workflow.stageIds[0] === ctx.stage.id,
+      fields: [{ key: '_first', label: '', kind: 'note', text: 'This is the first stage, so it starts as soon as a new request comes in. There is nothing to set here.' }],
+    },
+    {
       id: 'start',
       title: 'When does this stage start?',
+      showIf: (_c, ctx) => ctx.workflow.stageIds[0] !== ctx.stage.id,
       fields: [
         {
           key: 'startsWhen',
@@ -260,6 +293,7 @@ const stageStart: NodeTypeDef = {
   ],
   getOutcomes: () => [{ key: 'start', label: 'Start' }],
   summary: (n) => {
+    if (n.config.startsWhen === 'newRequest') return 'When a new request comes in'
     switch (n.config.startsWhen) {
       case 'specificStage':
         return 'When a chosen stage completes'
@@ -280,7 +314,7 @@ const stageComplete: NodeTypeDef = {
   label: 'Stage complete',
   icon: CircleCheck,
   description: 'Ends the stage and unlocks the next one.',
-  ...END_LOOK,
+  ...DONE_LOOK,
   isEnd: true,
   shape: 'pill',
   defaultName: 'Stage complete',
@@ -304,7 +338,7 @@ const stageComplete: NodeTypeDef = {
           key: '_noNext',
           label: '',
           kind: 'note',
-          text: 'This is the last stage for now. Add a stage and this step will connect to its start.',
+          text: 'This is the last stage, so completing it completes the whole request.',
           showIf: (s, ctx) => s.unlock !== 'choose' && ctx.workflow.stageIds[ctx.workflow.stageIds.length - 1] === ctx.stage.id,
         },
         {
@@ -349,11 +383,15 @@ const stageComplete: NodeTypeDef = {
       return n.config.stageId && !ctx.workflow.stages[String(n.config.stageId)]
         ? [{ severity: 'error', message: 'The stage this unlocks no longer exists. Choose another.', field: 'stageId' }]
         : []
-    const ids = ctx.workflow.stageIds
-    return ids[ids.length - 1] === ctx.stage.id
-      ? [{ severity: 'warning', message: 'There is no next stage to unlock yet. Add a stage after this one, or choose a stage.', field: 'unlock' }]
-      : []
+    return []
   },
+}
+
+/** Pre-fill the email from the chosen template; a template the admin added themselves starts empty */
+function fillEmail(prev: WorkflowNode, next: WorkflowNode, path: string, key = 'templateId'): WorkflowNode {
+  if (path !== key) return next
+  const tpl = findTemplate(next.config[key])
+  return { ...next, config: { ...next.config, emailSubject: tpl?.subject ?? '', emailBody: tpl?.body ?? '' } }
 }
 
 const closeRequest: NodeTypeDef = {
@@ -361,90 +399,96 @@ const closeRequest: NodeTypeDef = {
   category: 'startEnd',
   label: 'Close request',
   icon: CircleX,
-  description: 'Ends the whole request with a status.',
+  description: 'Ends the whole request, records why and can email the vendor.',
   ...END_LOOK,
   isEnd: true,
   shape: 'pill',
   defaultName: 'Close request',
-  defaultConfig: () => ({ statusLabel: '', reasonMode: 'optional', reasonSource: 'predefined', reason: '', reasonField: '', notes: '', emailVendor: false, templateId: '' }),
+  defaultConfig: () => ({ statusLabel: '', reasonMode: 'required', reasonSource: 'step', reason: '', emailVendor: true, templateId: '', emailSubject: '', emailBody: '' }),
+  onConfigChange: fillEmail,
   configSchema: [
     {
       id: 'close',
       title: 'Closing',
       fields: [
-        {
-          key: 'statusLabel',
-          label: 'Status shown (optional)',
-          kind: 'text',
-          maxLength: 60,
-          placeholder: 'e.g. Rejected – Partnership Admin',
-          help: 'Leave empty when no status should be shown, for example when the agent rejects and the vendor is only emailed.',
-        },
+        { key: 'statusLabel', label: 'Status shown on the request', kind: 'text', required: true, maxLength: 60, placeholder: 'e.g. Rejected – by agent' },
         {
           key: 'reasonMode',
-          label: 'Closure reason',
+          label: 'Reason for closing',
           kind: 'radio',
           options: opt([
-            ['required', 'Required'],
+            ['required', 'Mandatory'],
             ['optional', 'Optional'],
-            ['none', 'Not asked'],
           ]),
-          help: 'Whether a reason has to be recorded when the request is closed.',
         },
         {
           key: 'reasonSource',
-          label: 'Where the reason comes from',
+          label: 'Who gives the reason',
           kind: 'radio',
           options: opt([
-            ['predefined', 'I write it here'],
-            ['dynamic', 'It comes from the case'],
+            ['step', 'The agent or person who closes it'],
+            ['fixed', 'A fixed reason I write here'],
           ]),
-          showIf: (s) => s.reasonMode !== 'none',
+        },
+        {
+          key: '_stepReason',
+          label: '',
+          kind: 'note',
+          text: (s) =>
+            `The agent or reviewer ${s.reasonMode === 'required' ? 'must' : 'can'} state the reason when they close the request. It is added to the email as {reason}.`,
+          showIf: (s) => s.reasonSource !== 'fixed',
         },
         {
           key: 'reason',
           label: 'Reason',
           kind: 'text',
-          maxLength: 200,
-          placeholder: 'e.g. No internal interest members responded',
-          showIf: (s) => s.reasonMode !== 'none' && s.reasonSource !== 'dynamic',
-        },
-        {
-          key: 'reasonField',
-          label: 'Take the reason from',
-          kind: 'caseFieldSelect',
-          options: caseFieldOptions(['text']),
-          placeholder: 'Choose a field',
-          showIf: (s) => s.reasonMode !== 'none' && s.reasonSource === 'dynamic',
-        },
-        { key: 'notes', label: 'Internal notes (optional)', kind: 'textarea', maxLength: 300, help: 'Only admins see these.' },
-        { key: 'emailVendor', label: 'Email the vendor', kind: 'toggle' },
-        {
-          key: 'templateId',
-          label: 'Email template',
-          kind: 'select',
           required: true,
-          allowCustom: true,
-          options: templateOptions,
-          showIf: (s) => !!s.emailVendor,
+          maxLength: 200,
+          placeholder: 'e.g. The vendor cancelled the form',
+          showIf: (s) => s.reasonSource === 'fixed',
         },
+      ],
+    },
+    {
+      id: 'email',
+      title: 'Email to the vendor',
+      fields: [
+        { key: 'emailVendor', label: 'Email the vendor', kind: 'toggle' },
+        { key: 'templateId', label: 'Email template', kind: 'select', required: true, allowCustom: true, options: templateOptions, showIf: (s) => !!s.emailVendor },
+        { key: 'emailSubject', label: 'Subject', kind: 'text', required: true, maxLength: 120, showIf: (s) => !!s.emailVendor && !!s.templateId },
         {
-          key: '_ends',
-          label: '',
-          kind: 'note',
-          text: 'The request ends here. It does not move on to the next stage.',
+          key: 'emailBody',
+          label: 'Email',
+          kind: 'textarea',
+          required: true,
+          maxLength: 2000,
+          rows: 8,
+          placeholder: 'Write the email the vendor receives',
+          help: 'You can change the wording. {vendorName}, {caseId} and {reason} are filled in when it is sent.',
+          showIf: (s) => !!s.emailVendor && !!s.templateId,
         },
+        { key: '_ends', label: '', kind: 'note', text: 'The request ends here. It does not move on to the next stage.' },
       ],
     },
   ],
   getOutcomes: () => [],
-  summary: (n) => `${asString(n.config.statusLabel) || 'Closed'} · ends the request`,
-  validate: (n) => {
-    const c = n.config
-    if (c.reasonMode !== 'required') return []
-    if (c.reasonSource === 'dynamic')
-      return c.reasonField ? [] : [{ severity: 'error', message: 'Choose where the closure reason comes from.', field: 'reasonField' }]
-    return asString(c.reason).trim() ? [] : [{ severity: 'error', message: 'Write the closure reason, or make it optional.', field: 'reason' }]
+  summary: (n) => `${asString(n.config.statusLabel) || 'Closed'} · ${n.config.emailVendor ? 'emails the vendor' : 'ends the request'}`,
+  // When a person rejects, they must give a reason and the vendor is emailed it
+  validate: (n, ctx) => {
+    const byPeople = Object.values(ctx.stage.nodes).filter(
+      (s) => s.type === 'step' && actorOf(s.config) === 'human' && s.outcomes.some((o) => o.targetNodeId === n.id)
+    )
+    if (byPeople.length === 0) return []
+    const out: NodeIssue[] = []
+    if (n.config.reasonMode !== 'required')
+      out.push({ severity: 'error', message: 'A person closes the request here, so the reason must be mandatory.', field: 'reasonMode' })
+    if (!n.config.emailVendor)
+      out.push({ severity: 'error', message: 'A person closes the request here, so the vendor must be emailed the reason.', field: 'emailVendor' })
+    for (const s of byPeople)
+      for (const o of s.outcomes.filter((o) => o.targetNodeId === n.id))
+        if (!asString((items(s.config.outcomes).find((i) => i.id === o.key) as { ask?: unknown } | undefined)?.ask).trim())
+          out.push({ severity: 'error', message: `“${s.name}” must ask for a reason when “${o.label}” is chosen.` })
+    return out
   },
 }
 
@@ -497,6 +541,7 @@ const ACTIONS: Record<Actor, ActionDef[]> = {
     { value: 'approve', label: 'Approve or reject', outcomes: ['Approved', 'Rejected'] },
     { value: 'review', label: 'Review and decide', outcomes: ['Proceed', 'Reject'] },
     { value: 'provide', label: 'Provide information', outcomes: ['Information provided'] },
+    { value: 'sendRequest', label: 'Review the people and send the request', outcomes: ['Request sent'] },
     { value: 'upload', label: 'Upload documents', outcomes: ['Uploaded'] },
     { value: 'confirm', label: 'Confirm something is done', outcomes: ['Confirmed'] },
     { value: 'custom', label: 'Something else', outcomes: ['Done'] },
@@ -510,7 +555,6 @@ const ACTIONS: Record<Actor, ActionDef[]> = {
   ],
   system: [
     { value: 'email', label: 'Send an email', outcomes: ['Sent'] },
-    { value: 'notify', label: 'Send an in-app notification', outcomes: ['Sent'] },
     { value: 'wait', label: 'Wait for a set time', outcomes: ['Time is up'] },
     { value: 'integration', label: 'Call an integration', outcomes: ['Succeeded', 'Failed'] },
     { value: 'update', label: 'Update the case status', outcomes: ['Updated'] },
@@ -521,6 +565,8 @@ const ACTIONS: Record<Actor, ActionDef[]> = {
 const actorOf = (config: Record<string, unknown>): Actor => (config.actor === 'agent' || config.actor === 'system' ? config.actor : 'human')
 const actionOf = (config: Record<string, unknown>) => ACTIONS[actorOf(config)].find((a) => a.value === config.action)
 const defaultOutcomes = (config: Record<string, unknown>) => actionOf(config)?.outcomes ?? ['Done']
+
+const STEP_EYEBROW: Record<Actor, string> = { human: 'Person', agent: 'AI agent', system: 'Automatic' }
 
 const STEP_LOOKS: Record<Actor, Pick<NodeView, 'icon' | 'accent' | 'cardTone' | 'mapColor'>> = {
   human: { icon: User, accent: 'bg-blue-50 text-blue-600 border-blue-200', cardTone: 'bg-blue-50 border-blue-200', mapColor: '#3b82f6' },
@@ -557,6 +603,7 @@ const step: NodeTypeDef = {
     approvers: 1,
     approvalRule: 'all',
     agentId: '',
+    prompt: '',
     action: 'review',
     customAction: '',
     formId: '',
@@ -572,6 +619,8 @@ const step: NodeTypeDef = {
     chooseExtraLabel: 'Others',
     tasks: [newItem()],
     templateId: '',
+    emailSubject: '',
+    emailBody: '',
     recipients: [],
     wait: { value: 1, unit: 'businessDays' },
     integrationId: '',
@@ -582,11 +631,13 @@ const step: NodeTypeDef = {
   slaFor: (n) => (actorOf(n.config) === 'human' && n.config.action !== 'submit' ? 'human' : undefined),
   view: (n) => {
     const actor = actorOf(n.config)
-    const action = actionOf(n.config)
-    const what = action?.value === 'custom' ? asString(n.config.customAction) || 'Custom' : (action?.label ?? '')
-    return { ...STEP_LOOKS[actor], label: `${ACTORS[actor].short} · ${what}` }
+    return { ...STEP_LOOKS[actor], label: STEP_EYEBROW[actor] }
   },
   onConfigChange: (prev, next, path) => {
+    // Choosing an agent fills in its prompt; an agent the admin added themselves starts with an empty prompt
+    if (path === 'agentId') return { ...next, config: { ...next.config, prompt: findAgent(next.config.agentId)?.prompt ?? '' } }
+    if (path === 'templateId') return fillEmail(prev, next, path)
+    if (path === 'assignee') return { ...next, config: { ...next.config, assigneeUser: '' } }
     if (path === 'actor') {
       const actor = actorOf(next.config)
       return resetOutcomes(prev, { ...next, config: { ...next.config, action: ACTORS[actor].first } })
@@ -597,32 +648,43 @@ const step: NodeTypeDef = {
   configSchema: [
     {
       id: 'who',
-      title: 'Who does this step?',
+      title: 'Who does this',
+      showIf: (c) => actorOf(c) === 'human',
       fields: [
         {
-          key: 'actor',
-          label: 'Done by',
-          kind: 'radio',
-          options: (Object.keys(ACTORS) as Actor[]).map((value) => ({ value, label: ACTORS[value].label })),
-        },
-        {
           key: 'assignee',
-          label: 'Which person or group',
+          label: 'Assigned to',
           kind: 'select',
           required: true,
           allowCustom: true,
           options: assigneeOptions,
-          help: 'The vendor, a role, a team or one person.',
-          showIf: is('human'),
+          help: 'A role, a team, one person or the vendor.',
+        },
+        {
+          key: 'assigneeUser',
+          label: 'Person in this role',
+          kind: 'select',
+          required: true,
+          options: (_ctx, s) =>
+            (findRole(s.assignee)?.memberIds ?? []).map((id) => ({ value: id, label: findUser(id)?.name ?? id, hint: findUser(id)?.title })),
+          help: 'Who does this step for this role.',
+          showIf: (s) => !!findRole(s.assignee)?.memberIds?.length,
+        },
+        {
+          key: '_perCase',
+          label: '',
+          kind: 'note',
+          text: 'The person is set on each request when this role is filled, so there is nobody to pick here.',
+          showIf: (s) => !!findRole(s.assignee)?.perCase,
         },
         {
           key: 'approvers',
-          label: 'How many people',
+          label: 'Number of people in the group who review',
           kind: 'number',
+          required: true,
           min: 1,
           max: 50,
-          help: 'How many people this request goes to. Use more than one for several approvers.',
-          showIf: is('human'),
+          showIf: (s) => isGroup(s.assignee),
         },
         {
           key: 'approvalRule',
@@ -634,14 +696,32 @@ const step: NodeTypeDef = {
             ['any', 'Any one person has responded'],
             ['majority', 'More than half have responded'],
           ]),
-          showIf: (s) => actorOf(s) === 'human' && Number(s.approvers) > 1,
+          showIf: (s) => isGroup(s.assignee) && Number(s.approvers) > 1,
         },
-        { key: 'agentId', label: 'Which agent', kind: 'select', required: true, allowCustom: true, options: agentOptions, showIf: is('agent') },
+      ],
+    },
+    {
+      id: 'agent',
+      title: 'Agent',
+      showIf: (c) => actorOf(c) === 'agent',
+      fields: [
+        { key: 'agentId', label: 'Agent', kind: 'select', required: true, allowCustom: true, options: agentOptions },
+        {
+          key: 'prompt',
+          label: 'Instructions for the agent (prompt)',
+          kind: 'textarea',
+          required: true,
+          maxLength: 4000,
+          rows: 14,
+          placeholder: 'Tell the agent what to do, which checks to run and what to produce',
+          help: 'Filled in from the agent you choose. Edit it to change what the agent does.',
+        },
       ],
     },
     {
       id: 'what',
-      title: 'What do they do?',
+      title: 'What they need to do',
+      showIf: (c) => actorOf(c) !== 'agent',
       fields: [
         {
           key: 'action',
@@ -649,6 +729,7 @@ const step: NodeTypeDef = {
           kind: 'select',
           required: true,
           options: (_ctx, scope) => ACTIONS[actorOf(scope)].map((a) => ({ value: a.value, label: a.label })),
+          showIf: (s) => actorOf(s) !== 'agent',
         },
         {
           key: 'customAction',
@@ -661,8 +742,56 @@ const step: NodeTypeDef = {
         },
         { key: 'formId', label: 'Form to fill in', kind: 'select', required: true, allowCustom: true, options: formOptions, showIf: is('human', 'submit') },
         {
+          key: 'peopleFrom',
+          label: 'Send to the people from',
+          kind: 'select',
+          required: true,
+          options: (ctx) => [
+            ...Object.values(ctx.stage.nodes)
+              .filter((n) => n.type === 'step' && actorOf(n.config) === 'agent')
+              .map((n) => ({ value: n.id, label: n.name, group: 'Suggested by a step' })),
+            ...teamOptions().map((o) => ({ ...o, group: 'Teams' })),
+          ],
+          help: 'The list is filled in for the reviewer. They can add or remove people before sending; the request then appears in the app for those people.',
+          showIf: is('human', 'sendRequest'),
+        },
+        {
+          key: 'maxPeople',
+          label: 'Most people the request can go to',
+          kind: 'number',
+          required: true,
+          min: 1,
+          max: 50,
+          showIf: is('human', 'sendRequest'),
+        },
+        {
+          key: 'acknowledgement',
+          label: 'They must first confirm',
+          kind: 'text',
+          required: true,
+          maxLength: 120,
+          placeholder: 'e.g. The vendor has signed the NDA',
+          showIf: is('human', 'upload'),
+        },
+        {
+          key: 'documentName',
+          label: 'Document to upload',
+          kind: 'text',
+          required: true,
+          maxLength: 80,
+          placeholder: 'e.g. Signed NDA',
+          showIf: is('human', 'upload'),
+        },
+        {
+          key: 'uploadOptional',
+          label: 'They can skip the upload',
+          kind: 'toggle',
+          help: 'Turn on when the document is nice to have, for example a call recording.',
+          showIf: is('human', 'upload'),
+        },
+        {
           key: 'instructions',
-          label: 'What they need to do',
+          label: 'Action description',
           kind: 'textarea',
           maxLength: 300,
           placeholder: 'e.g. Review the assessment brief and the agent analysis',
@@ -677,9 +806,11 @@ const step: NodeTypeDef = {
           addLabel: 'Add agent task',
           newItem: () => newItem(),
           itemSchema: [{ key: 'label', label: 'Agent task', kind: 'text', required: true, placeholder: 'e.g. Check for duplicate requests' }],
-          showIf: is('agent'),
+          showIf: () => false,
         },
-        { key: 'templateId', label: 'Message template', kind: 'select', required: true, allowCustom: true, options: templateOptions, showIf: is('system', 'email', 'notify') },
+        { key: 'templateId', label: 'Email template', kind: 'select', required: true, allowCustom: true, options: templateOptions, showIf: is('system', 'email', 'notify') },
+        { key: 'emailSubject', label: 'Subject', kind: 'text', required: true, maxLength: 120, showIf: (s) => is('system', 'email', 'notify')(s) && !!s.templateId },
+        { key: 'emailBody', label: 'Email', kind: 'textarea', required: true, maxLength: 2000, showIf: (s) => is('system', 'email', 'notify')(s) && !!s.templateId },
         {
           key: 'recipients',
           label: 'Send to',
@@ -696,7 +827,7 @@ const step: NodeTypeDef = {
       id: 'info',
       title: 'What the person sees and fills in',
       collapsed: true,
-      showIf: (c) => actorOf(c) === 'human',
+      showIf: (c) => actorOf(c) === 'human' && (items(c.displayInfo).length > 0 || items(c.requiredInputs).length > 0),
       fields: [
         {
           key: 'displayInfo',
@@ -721,7 +852,7 @@ const step: NodeTypeDef = {
       id: 'pick',
       title: 'Choose people from earlier responses',
       collapsed: true,
-      showIf: (c) => actorOf(c) === 'human',
+      showIf: (c) => actorOf(c) === 'human' && !!c.choosePeople,
       fields: [
         {
           key: 'choosePeople',
@@ -757,19 +888,27 @@ const step: NodeTypeDef = {
     },
     {
       id: 'outcomes',
-      title: 'What can happen next?',
+      title: 'Step 1 · Possible results',
       fields: [
         {
           key: 'outcomes',
-          label: 'Outcomes',
+          label: 'Results of this step',
           kind: 'list',
-          help: 'Name every result this step can have, in your own words. Each one becomes a path you connect to the next step.',
+          help: 'Name each way this step can end, for example "Approved" and "Rejected". In the next section you choose where each result leads.',
+          itemTitle: (item, i) => `Result ${i + 1}${asString(item.label) ? `: ${asString(item.label)}` : ''}`,
           minItems: 1,
-          addLabel: 'Add outcome',
+          addLabel: 'Add result',
           newItem: () => newItem(),
           itemSchema: [
-            { key: 'label', label: 'Outcome', kind: 'text', required: true, placeholder: 'e.g. Needs more information' },
-            { key: 'ask', label: 'Ask for this when it is chosen (optional)', kind: 'text', maxLength: 80, placeholder: 'e.g. A reason' },
+            { key: 'label', label: 'Result name', kind: 'text', required: true, placeholder: 'e.g. Approved' },
+            {
+              key: 'ask',
+              label: 'Ask the reviewer for (optional)',
+              kind: 'text',
+              maxLength: 80,
+              placeholder: 'e.g. Reason for rejection',
+              showIf: (_s, ctx) => actorOf(ctx.node.config) === 'human',
+            },
           ],
         },
       ],
@@ -780,13 +919,12 @@ const step: NodeTypeDef = {
     const c = n.config
     switch (actorOf(c)) {
       case 'human': {
-        const who = (assigneeName(c.assignee) ?? 'Nobody chosen') + (Number(c.approvers) > 1 ? ` · ${c.approvers} people` : '')
+        const person = findRole(c.assignee) ? findUser(c.assigneeUser)?.name : undefined
+        const who = (person ? `${assigneeName(c.assignee)} · ${person}` : (assigneeName(c.assignee) ?? 'Nobody chosen')) + (isGroup(c.assignee) && Number(c.approvers) > 1 ? ` · ${c.approvers} people` : '')
         return c.action === 'submit' ? `${who} · ${nameOf(c.formId, findForm) ?? 'No form selected'}` : who
       }
-      case 'agent': {
-        const agent = nameOf(c.agentId, findAgent)
-        return agent ? `${agent} · ${countText(items(c.tasks).filter((t) => t.label.trim()).length, 'task')}` : 'No agent selected'
-      }
+      case 'agent':
+        return nameOf(c.agentId, findAgent) ?? 'No agent selected'
       default:
         switch (c.action) {
           case 'email':
@@ -809,7 +947,7 @@ const step: NodeTypeDef = {
     const c = n.config
     const out: NodeIssue[] = []
     if (actorOf(c) !== 'human') return out
-    if (!(Number(c.approvers) >= 1)) out.push({ severity: 'error', message: 'Say how many people this step goes to (at least 1).', field: 'approvers' })
+    if (isGroup(c.assignee) && !(Number(c.approvers) >= 1)) out.push({ severity: 'error', message: 'Say how many people this step goes to (at least 1).', field: 'approvers' })
     if (c.choosePeople) {
       const from = ctx.stage.nodes[String(c.chooseFrom)]
       if (c.chooseFrom && !from) out.push({ severity: 'error', message: 'The step whose responses are used for choosing people no longer exists.', field: 'chooseFrom' })
@@ -827,6 +965,7 @@ const step: NodeTypeDef = {
     return out
   },
   outputs: (n) => {
+    if (actorOf(n.config) === 'agent') return findAgent(n.config.agentId)?.outputs ?? []
     const form = actorOf(n.config) === 'human' && n.config.action === 'submit' ? findForm(n.config.formId) : undefined
     return form ? fieldsToOutputs(form.fields) : []
   },
@@ -1570,11 +1709,11 @@ const actionItem = (key: string, label: string, description: string, actor: Acto
 /** The node library, in the order it is shown */
 export const PALETTE: PaletteItem[] = [
   ...[formSubmission, stageStart, stageComplete, closeRequest, stopWithLabel].map(ofType),
-  actionItem('aiAgent', 'AI Agent', 'An AI agent checks or analyses the request.', 'agent', 'check', 'AI agent task'),
+  actionItem('aiAgent', 'AI Agent', 'An AI agent follows a prompt to check or analyse the request.', 'agent', 'check', 'AI agent task'),
   actionItem('humanTask', 'Human Task', 'A person does a piece of work or makes a decision.', 'human', 'review', 'Human task'),
   actionItem('approval', 'Approval', 'One or more people approve or reject.', 'human', 'approve', 'Approval'),
   ofType(collectResponses),
-  actionItem('notification', 'Send Notification', 'Send an email or an in-app message.', 'system', 'notify', 'Send notification'),
+  actionItem('notification', 'Send Email', 'Send an email to the vendor or to people inside M42.', 'system', 'email', 'Send email'),
   ...[decision, ifCondition, andCondition, orCondition, merge, split, slaCheck, onHold].map(ofType),
 ]
 

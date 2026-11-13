@@ -103,13 +103,15 @@ export interface Reminder {
   channels: ('email' | 'inApp')[]
   recipients: Recipient[]
   templateId: ID
+  /** The admin's own wording of the template email */
+  email?: { for: ID; text: string }
 }
 
 export type BreachAction =
-  | { kind: 'closeRequest'; statusLabel: string; notifyVendor: boolean }
+  | { kind: 'closeRequest'; statusLabel: string; notifyVendor: boolean; templateId?: ID; emailBody?: string }
   | { kind: 'escalate'; to: Recipient[] }
   | { kind: 'reassign'; to: Recipient[] }
-  | { kind: 'notifyOnly'; to: Recipient[]; templateId: ID }
+  | { kind: 'notifyOnly'; to: Recipient[]; templateId: ID; email?: { for: ID; text: string } }
   | { kind: 'takeOutcome'; outcomeId: ID }
   | { kind: 'routeTo'; nodeId: ID }
 

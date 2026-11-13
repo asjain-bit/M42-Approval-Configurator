@@ -84,6 +84,10 @@ export interface FieldSchema {
   text?: string | ((scope: Record<string, unknown>, ctx: SchemaContext) => string)
   /** For 'duration': allowed units */
   units?: OptionItem[]
+  /** For 'textarea': visible lines before it grows with its content */
+  rows?: number
+  /** For a template 'select': key where the admin's own wording of the email is kept; the email is shown below */
+  emailKey?: string
 }
 
 export interface SectionSchema {

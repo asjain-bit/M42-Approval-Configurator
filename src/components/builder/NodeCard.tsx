@@ -14,6 +14,8 @@ export type NodeCardData = {
   stageId?: string
   errors: number
   toConfirm: number
+  /** What is wrong or still to decide, listed when hovering the badges */
+  messages?: { error: boolean; text: string }[]
   disabled: boolean
   /** Belongs to another stage: shown for context, opens that stage when clicked */
   inactive?: boolean
@@ -30,7 +32,7 @@ export type FlowNode = Node<NodeCardData, 'wfNode'>
  * Used in: FlowCanvas
  */
 export const NodeCard = memo(function NodeCard({ data, selected }: NodeProps<FlowNode>) {
-  const { node, errors, toConfirm, disabled, inactive } = data
+  const { node, errors, toConfirm, messages = [], disabled, inactive } = data
   const def = getNodeType(node.type)
   const view = nodeView(node)
   const accent = view.accent
@@ -66,11 +68,30 @@ export const NodeCard = memo(function NodeCard({ data, selected }: NodeProps<Flo
       )}
 
       {/* Badges */}
-      <div className="absolute -top-2.5 right-3 flex items-center gap-1">
+      <div className="group/badges absolute -top-2.5 right-3 flex items-center gap-1">
+        {messages.length > 0 && (
+          <div
+            role="tooltip"
+            className="nodrag nopan hidden group-hover/badges:block absolute bottom-full right-0 pb-2 w-[280px] cursor-default"
+          >
+            <ul className="rounded-xl border border-[#e2e8f0] bg-white shadow-lg p-2.5 flex flex-col gap-2 text-left">
+              {messages.map((m, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-[#0d212c]">
+                  {m.error ? (
+                    <CircleAlert className="w-3.5 h-3.5 text-red-600 shrink-0 mt-px" aria-label="Error" />
+                  ) : (
+                    <CircleHelp className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-px" aria-label="To confirm" />
+                  )}
+                  <span>{m.text}</span>
+                </li>
+              ))}
+              <li className="text-[10px] text-[#64748b] border-t border-[#f1f5f9] pt-1.5">Click the step to fix these in the form.</li>
+            </ul>
+          </div>
+        )}
         {errors > 0 && (
           <span
             className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-full bg-red-600 text-white text-[10px] font-semibold shadow-xs"
-            title={`${errors} ${errors === 1 ? 'issue' : 'issues'}`}
           >
             <CircleAlert className="w-3 h-3" aria-hidden="true" />
             {errors}
@@ -79,7 +100,6 @@ export const NodeCard = memo(function NodeCard({ data, selected }: NodeProps<Flo
         {toConfirm > 0 && (
           <span
             className="inline-flex items-center gap-0.5 px-1.5 h-5 rounded-full bg-amber-400 text-[#4a2c00] text-[10px] font-semibold shadow-xs"
-            title={`${toConfirm} to confirm`}
           >
             <CircleHelp className="w-3 h-3" aria-hidden="true" />
             {toConfirm}

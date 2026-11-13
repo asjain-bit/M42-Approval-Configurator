@@ -19,7 +19,8 @@ export const humanSla = (): SlaConfig => ({
   duration: { value: 2, unit: 'businessDays' },
   clockStarts: 'onStepStart',
   reminders: [],
-  breachAction: null,
+  // A deadline always comes with what happens when it is missed: escalate (the vendor is not emailed)
+  breachAction: { kind: 'escalate', to: [] },
 })
 
 export const agentSla = (): SlaConfig => ({
@@ -38,10 +39,8 @@ export const customText = (v: string) => v.slice(CUSTOM_PREFIX.length).trim()
 export const asArray = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 export const asString = (v: unknown): string => (typeof v === 'string' ? v : '')
 
-export const CHANNEL_OPTIONS: OptionItem[] = opt([
-  ['email', 'Email'],
-  ['inApp', 'In-app'],
-])
+/** Email only for now: there is no in-app notification yet */
+export const CHANNEL_OPTIONS: OptionItem[] = opt([['email', 'Email']])
 
 export const FIELD_TYPE_OPTIONS: OptionItem[] = Object.entries(FIELD_TYPE_LABELS).map(
   ([value, label]) => ({ value, label })
@@ -180,7 +179,7 @@ export const eventNotificationsSection: SectionSchema = {
         },
         { key: 'recipients', label: 'Notify', kind: 'recipients' },
         { key: 'channels', label: 'Via', kind: 'multiselect', options: CHANNEL_OPTIONS },
-        { key: 'templateId', label: 'Using template', kind: 'select', options: templateOptions },
+        { key: 'templateId', label: 'Email template', kind: 'select', options: templateOptions, emailKey: 'email' },
       ],
     },
   ],

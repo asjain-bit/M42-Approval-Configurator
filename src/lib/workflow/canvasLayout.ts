@@ -2,11 +2,11 @@ import type { Stage, Workflow } from '@/types/workflow'
 import { autoLayout, nodeSize } from './layout'
 
 /** Space around the steps inside a stage box */
-export const BOX_PAD = 32
+export const BOX_PAD = 64
 /** Room at the top of a stage box for its title */
 export const BOX_HEADER = 56
 /** Gap between two stage boxes, where the hand-over arrow runs */
-export const BOX_GAP = 150
+export const BOX_GAP = 240
 const BOX_MIN_WIDTH = 360
 const BOX_MIN_HEIGHT = 240
 

@@ -10,6 +10,7 @@ import { caseDataDictionary, createNode, newStage, syncOutcomes, uniqueNodeName 
 import { autoLayout, nodeSize } from '@/lib/workflow/layout'
 import { useStageEditor } from '@/lib/workflow/useStageEditor'
 import { stageHealth, validateStage, type Issue } from '@/lib/workflow/validation'
+import { missingRequired } from '@/lib/workflow/required'
 import { newId } from '@/lib/id'
 import type { Stage, WorkflowNode } from '@/types/workflow'
 import { AppShell } from '@/components/templates/AppShell'
@@ -20,9 +21,8 @@ import { useToast } from '@/components/ui/Toast'
 import { btnIcon } from '@/components/ui/styles'
 import { FlowCanvas, type CanvasApi, type Selection } from './FlowCanvas'
 import { NodeForm, type NodeChange } from './NodeForm'
-import { NodePalette } from './NodePalette'
 import { NodePickerModal } from './NodePickerModal'
-import { StageBar } from './StageBar'
+import { StageSidebar } from './StageSidebar'
 import { StageSettings } from './StageSettings'
 import type { RoutingApi } from './fields/routing'
 
@@ -99,12 +99,13 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
   const caseFields = useMemo(() => (workflow ? caseDataDictionary(workflow) : []), [workflow])
   const issues = useMemo(() => (workflow && stage ? validateStage(workflow, stage, editor.allWorkflows) : []), [workflow, stage, editor.allWorkflows])
   const issueCounts = useMemo(() => {
-    const out: Record<string, { errors: number; toConfirm: number }> = {}
+    const out: Record<string, { errors: number; toConfirm: number; messages: { error: boolean; text: string }[] }> = {}
     for (const i of issues) {
       if (!i.nodeId) continue
-      out[i.nodeId] ??= { errors: 0, toConfirm: 0 }
+      out[i.nodeId] ??= { errors: 0, toConfirm: 0, messages: [] }
       if (i.severity === 'error') out[i.nodeId].errors++
       else out[i.nodeId].toConfirm++
+      out[i.nodeId].messages.push({ error: i.severity === 'error', text: i.message })
     }
     return out
   }, [issues])
@@ -115,6 +116,21 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
 
   const path = useCallback((...parts: string[]) => [stage?.name, ...parts].filter(Boolean).join(' › '), [stage?.name])
   const nodeName = (id: string | null | undefined) => (id && stage?.nodes[id]?.name) || 'nothing'
+
+  /** A step can only lead somewhere once its mandatory fields are filled in */
+  const blockedBy = (nodeId: string) => {
+    const node = stage?.nodes[nodeId]
+    if (!node || !workflow || !stage) return []
+    return missingRequired({ workflow, stage, node, caseFields, workflows: editor.allWorkflows })
+  }
+  const guardRouting = (nodeId: string) => {
+    const missing = blockedBy(nodeId)
+    if (missing.length === 0) return true
+    setSelection({ kind: 'node', id: nodeId })
+    setFormCollapsed(false)
+    toast(`Fill in ${missing.join(', ')} before choosing the next step`, 'error')
+    return false
+  }
 
   // ── Mutations ────────────────────────────────────────────────────────────
   const setTarget = (nodeId: string, outcomeId: string, targetId: string | null) => {
@@ -354,6 +370,7 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
           if (o) setTarget(selectedNode.id, o.id, target)
         },
         createNodeFor: (key) => setPicker({ nodeId: selectedNode.id, outcomeKey: key }),
+        missing: blockedBy(selectedNode.id),
       }
     : null
 
@@ -391,20 +408,15 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
         />
       }
     >
-      <StageBar
-        workflow={workflow}
-        currentStageId={stageId}
-        health={health}
-        onSelect={(id) => router.push(`/workflows/${workflowId}/stages/${id}`)}
-        onAdd={() => setAddingStage(true)}
-      />
       <div className="flex-1 min-h-0 flex">
-        <NodePalette
+        <StageSidebar
           workflow={workflow}
-          stage={stage}
+          currentStageId={stageId}
+          health={health}
           collapsed={paletteCollapsed}
           onToggle={() => setPaletteCollapsed((v) => !v)}
-          onAdd={(type) => addNode(type)}
+          onSelect={(id) => router.push(`/workflows/${workflowId}/stages/${id}`)}
+          onAdd={() => setAddingStage(true)}
         />
 
         <div className="relative flex-1 min-w-0 flex">
@@ -423,14 +435,14 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
                 if (s) setFormCollapsed(false)
                 setFocus((f) => ({ field: null, tick: f.tick }))
               }}
-              onConnect={(src, outcomeId, target) => setTarget(src, outcomeId, target)}
+              onConnect={(src, outcomeId, target) => guardRouting(src) && setTarget(src, outcomeId, target)}
               onDisconnect={(src, outcomeId) => setTarget(src, outcomeId, null)}
               onMoveNodes={(positions) => applyStage(stageId, (s) => ({ ...s, layout: { ...s.layout, ...positions } }), [], { keepStatus: true })}
               onDropNode={(type, pos) => addNode(type, pos)}
               onRequestDelete={(id) => setDeletingId(id)}
               onDuplicate={duplicateNode}
               onAutoLayout={runAutoLayout}
-              onAddNext={(nodeId, outcomeKey) => setPicker({ nodeId, outcomeKey })}
+              onAddNext={(nodeId, outcomeKey) => guardRouting(nodeId) && setPicker({ nodeId, outcomeKey })}
             />
           </ReactFlowProvider>
 

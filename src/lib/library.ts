@@ -102,6 +102,8 @@ export interface AgentDefinition {
   id: ID
   name: string
   description: string
+  /** What the agent is told to do; pre-fills the prompt when the agent is chosen */
+  prompt?: string
   actions: AgentAction[]
   outputs: AgentOutput[]
 }
@@ -109,6 +111,10 @@ export interface AgentDefinition {
 export interface Role {
   id: ID
   name: string
+  /** People who hold this role; one of them is picked for a step */
+  memberIds?: ID[]
+  /** Filled in for each request (e.g. the sponsor chosen in Internal Canvas), so no person is picked in the workflow */
+  perCase?: boolean
 }
 export interface Team {
   id: ID
@@ -195,6 +201,8 @@ export const AGENTS: AgentDefinition[] = [
     name: 'Intake agent',
     description:
       'Checks the vendor form for completeness, validity, duplicates, existing M42 solutions and similar funded use cases, then writes the Initial Assessment Brief.',
+    prompt:
+      'Analyse the vendor partnership form and run these checks:\n1. Is this a duplicate of an earlier request?\n2. Does M42 already have an existing solution for this use case?\n3. Is the request aligned with M42 strategy?\n4. Is the information complete and valid?\n\nIf every check passes, write an Initial Assessment Brief summarising the request and your findings. The brief is shown to every approver.\nIf any check fails, reject the request and state the reason clearly; the reason is sent to the vendor.',
     actions: [
       {
         id: 'assess-vendor-request',
@@ -221,6 +229,8 @@ export const AGENTS: AgentDefinition[] = [
     id: 'internal-interest-matcher',
     name: 'Internal interest matcher',
     description: 'Recommends the internal interest team members best suited to assess a request.',
+    prompt:
+      'Read the Initial Assessment Brief and the vendor form. From the internal interest team, find the 5 people who know this use case best.\nFor each person, give one line on why they are relevant.\nThe director will check your list before the questionnaire is sent.',
     actions: [
       {
         id: 'recommend-members',
@@ -229,6 +239,51 @@ export const AGENTS: AgentDefinition[] = [
       },
     ],
     outputs: [{ key: 'recommendedMembers', label: 'Recommended members', type: 'people' }],
+  },
+  {
+    id: 'pre-read-agent',
+    name: 'Pre-read summary agent',
+    description: 'Writes a short pre-read summary of the request for the strategy team.',
+    prompt:
+      'Read the Initial Assessment Brief, the vendor form and the internal interest answers. Write a one-page pre-read for the strategy team: what the vendor offers, who sponsors it, how it fits M42 strategy, and the main risks. End with the decision the strategy team needs to make.',
+    actions: [{ id: 'write-pre-read', name: 'Write pre-read summary', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [{ key: 'preReadSummary', label: 'Pre-read summary', type: 'document' }],
+  },
+  {
+    id: 'alignment-pack-agent',
+    name: 'Alignment pack agent',
+    description: 'Puts together the alignment pack once the NDA is signed.',
+    prompt:
+      'Using the signed NDA, the Initial Assessment Brief, the sponsor details and the strategy team decision, put together the alignment pack: a summary of the request, the agreed scope, the sponsors, open questions for the vendor and the next steps for the discovery call.',
+    actions: [{ id: 'build-pack', name: 'Build alignment pack', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [{ key: 'alignmentPack', label: 'Alignment pack', type: 'document' }],
+  },
+  {
+    id: 'call-summary-agent',
+    name: 'Discovery call summary agent',
+    description: 'Summarises the discovery call from its transcript or recording.',
+    prompt:
+      'Summarise the discovery call with the vendor. Use the transcript or recording if one was uploaded; otherwise use the alignment pack and the notes in the case. Cover what the vendor showed, answers to the open questions, concerns raised and agreed next steps.',
+    actions: [{ id: 'summarise-call', name: 'Summarise call', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [{ key: 'discoveryCallSummary', label: 'Discovery call summary', type: 'document' }],
+  },
+  {
+    id: 'value-summary-agent',
+    name: 'Value assessment summary agent',
+    description: 'Writes the value assessment summary from the business case.',
+    prompt:
+      'Read the business case uploaded by the sponsor and the notes from the value assessment call. Write the value assessment summary: expected benefits, costs, risks, who gains and how success will be measured.',
+    actions: [{ id: 'summarise-value', name: 'Summarise value', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [{ key: 'valueAssessmentSummary', label: 'Value assessment summary', type: 'document' }],
+  },
+  {
+    id: 'tdd-report-agent',
+    name: 'TDD report agent',
+    description: 'Writes the technical due diligence report once every assessment is complete.',
+    prompt:
+      'Combine all completed technical assessments into the Technical Due Diligence (TDD) report: security, architecture, data and integration findings, risks with their severity, and a clear recommendation for the sponsor.',
+    actions: [{ id: 'write-tdd', name: 'Write TDD report', results: [{ key: 'done', label: 'Done' }] }],
+    outputs: [{ key: 'tddReport', label: 'TDD report', type: 'document' }],
   },
   {
     id: 'vendor-form-checker',
@@ -246,9 +301,11 @@ export const AGENTS: AgentDefinition[] = [
 ]
 
 export const ROLES: Role[] = [
-  { id: 'role-partnership-admin', name: 'Partnership Admin' },
-  { id: 'role-partnership-director', name: 'Partnership Director' },
-  { id: 'role-superadmin', name: 'Superadmin' },
+  { id: 'role-partnership-admin', name: 'Partnership Admin', memberIds: ['u11', 'u12'] },
+  { id: 'role-partnership-director', name: 'Partnership Director', memberIds: ['u13'] },
+  { id: 'role-superadmin', name: 'Superadmin', memberIds: ['u14'] },
+  { id: 'role-tdd-admin', name: 'TDD Admin', memberIds: ['u15', 'u16'] },
+  { id: 'role-sponsor', name: 'Sponsor (chosen in Internal Canvas)', perCase: true },
 ]
 
 export const USERS: User[] = [
@@ -262,13 +319,24 @@ export const USERS: User[] = [
   { id: 'u8', name: 'Ahmed Saleh', email: 'ahmed.saleh@m42.ae', title: 'AI Lab (sample)' },
   { id: 'u9', name: 'Noura Al-Mazrouei', email: 'noura.almazrouei@m42.ae', title: 'Patient Experience (sample)' },
   { id: 'u10', name: 'Tariq Fadel', email: 'tariq.fadel@m42.ae', title: 'Finance (sample)' },
+  { id: 'u11', name: 'Fatima Al-Suwaidi', email: 'fatima.alsuwaidi@m42.ae', title: 'Partnerships (sample)' },
+  { id: 'u12', name: 'Rashid Al-Mansoori', email: 'rashid.almansoori@m42.ae', title: 'Partnerships (sample)' },
+  { id: 'u13', name: 'Aisha Khan', email: 'aisha.khan@m42.ae', title: 'Partnerships Director (sample)' },
+  { id: 'u14', name: 'Hamad Al-Dhaheri', email: 'hamad.aldhaheri@m42.ae', title: 'Platform Admin (sample)' },
+  { id: 'u15', name: 'Reem Haddad', email: 'reem.haddad@m42.ae', title: 'Technical Due Diligence (sample)' },
+  { id: 'u16', name: 'Faisal Qureshi', email: 'faisal.qureshi@m42.ae', title: 'Technical Due Diligence (sample)' },
 ]
 
 export const TEAMS: Team[] = [
   {
     id: 'team-internal-interest',
     name: 'Internal Interest Team',
-    memberIds: USERS.map((u) => u.id),
+    memberIds: USERS.slice(0, 10).map((u) => u.id),
+  },
+  {
+    id: 'team-strategic-alignment',
+    name: 'Strategic Alignment Team',
+    memberIds: USERS.slice(0, 2).map((u) => u.id),
   },
 ]
 

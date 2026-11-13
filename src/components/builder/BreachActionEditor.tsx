@@ -2,18 +2,19 @@
 
 import React from 'react'
 import type { BreachAction, BreachKind, CaseField, Stage, WorkflowNode } from '@/types/workflow'
-import { STATUS_LABELS, TEMPLATES } from '@/lib/library'
-import { inputSmall, labelBase } from '@/components/ui/styles'
+import { findTemplate, STATUS_LABELS, TEMPLATES } from '@/lib/library'
+import { inputSmall, labelBase, textareaBase } from '@/components/ui/styles'
 import { RecipientsEditor } from './RecipientsEditor'
 import { Toggle } from './fields/Toggle'
+import { EmailPreview } from './EmailPreview'
 
 const KIND_LABELS: Record<BreachKind, string> = {
   closeRequest: 'Close the request',
-  escalate: 'Escalate to',
-  reassign: 'Reassign to',
-  notifyOnly: 'Notify only',
-  takeOutcome: 'Take an outcome',
-  routeTo: 'Go to a step',
+  escalate: 'Escalate to someone',
+  reassign: 'Hand it to someone else',
+  notifyOnly: 'Only send a reminder email',
+  takeOutcome: 'Choose a result automatically',
+  routeTo: 'Move to another step',
 }
 
 interface Props {
@@ -43,7 +44,7 @@ export const BreachActionEditor: React.FC<Props> = ({
   const setKind = (kind: string) => {
     switch (kind as BreachKind | '') {
       case 'closeRequest':
-        return onChange({ kind: 'closeRequest', statusLabel: 'Closed – SLA expired', notifyVendor: false })
+        return onChange({ kind: 'closeRequest', statusLabel: 'Closed – deadline missed', notifyVendor: false })
       case 'escalate':
         return onChange({ kind: 'escalate', to: [] })
       case 'reassign':
@@ -79,7 +80,7 @@ export const BreachActionEditor: React.FC<Props> = ({
       {value?.kind === 'closeRequest' && (
         <>
           <div>
-            <label className={labelBase}>Status label</label>
+            <label className={labelBase}>Status shown on the request</label>
             <input
               className={inputSmall}
               list="status-labels"
@@ -93,23 +94,61 @@ export const BreachActionEditor: React.FC<Props> = ({
             </datalist>
           </div>
           <Toggle label="Email the vendor" checked={value.notifyVendor} onChange={(v) => onChange({ ...value, notifyVendor: v })} />
+          {value.notifyVendor && (
+            <>
+              <div>
+                <label className={labelBase}>
+                  Email template <span className="text-red-600">*</span>
+                </label>
+                <select
+                  className={`${inputSmall} ${value.templateId ? '' : 'border-red-300'}`}
+                  value={value.templateId ?? ''}
+                  onChange={(e) => onChange({ ...value, templateId: e.target.value, emailBody: findTemplate(e.target.value)?.body ?? '' })}
+                >
+                  <option value="">Choose…</option>
+                  {TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {value.templateId && (
+                <div>
+                  <label className={labelBase}>Email</label>
+                  <textarea
+                    className={`${textareaBase} text-xs [field-sizing:content] !max-h-none`}
+                    rows={5}
+                    value={value.emailBody ?? ''}
+                    onChange={(e) => onChange({ ...value, emailBody: e.target.value })}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
       {(value?.kind === 'escalate' || value?.kind === 'reassign' || value?.kind === 'notifyOnly') && (
-        <RecipientsEditor value={value.to} onChange={(to) => onChange({ ...value, to })} caseFields={caseFields} />
+        <>
+          <RecipientsEditor value={value.to} onChange={(to) => onChange({ ...value, to })} caseFields={caseFields} />
+          {value.kind === 'escalate' && <p className="text-[11px] text-[#64748b] -mt-1">They are emailed and the request waits for them. The vendor is not emailed.</p>}
+        </>
       )}
       {value?.kind === 'notifyOnly' && (
-        <div>
-          <label className={labelBase}>Template</label>
-          <select className={inputSmall} value={value.templateId} onChange={(e) => onChange({ ...value, templateId: e.target.value })}>
-            <option value="">Choose…</option>
-            {TEMPLATES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          <div>
+            <label className={labelBase}>Email template</label>
+            <select className={inputSmall} value={value.templateId} onChange={(e) => onChange({ ...value, templateId: e.target.value })}>
+              <option value="">Choose…</option>
+              {TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <EmailPreview templateId={value.templateId} override={value.email} onChange={(email) => onChange({ ...value, email })} />
+        </>
       )}
       {value?.kind === 'takeOutcome' && (
         <select

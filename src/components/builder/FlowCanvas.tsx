@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useImperativeHandle, useMemo, useState, forwardRef } from 'react'
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -15,7 +15,7 @@ import {
   type Edge as FlowEdge,
   type NodeChange,
 } from '@xyflow/react'
-import { Copy, LayoutTemplate, MousePointerClick, Trash2 } from 'lucide-react'
+import { Copy, LayoutTemplate, MousePointerClick, Plus, Trash2 } from 'lucide-react'
 import type { Workflow } from '@/types/workflow'
 import { getNodeType, nodeView } from '@/lib/registry/nodes'
 import { stageEntry, stageLinks } from '@/lib/workflow/graph'
@@ -24,6 +24,7 @@ import type { StageHealth } from '@/lib/workflow/validation'
 import { MenuList } from '@/components/ui/Menu'
 import { NodeCard, type FlowNode } from './NodeCard'
 import { StageBox, type StageBoxNode } from './StageBox'
+import { NodePickerPopover } from './NodePickerModal'
 
 type CanvasNode = FlowNode | StageBoxNode
 
@@ -44,7 +45,7 @@ interface Props {
   stageId: string
   health: Record<string, StageHealth>
   onOpenStage: (stageId: string) => void
-  issueCounts: Record<string, { errors: number; toConfirm: number }>
+  issueCounts: Record<string, { errors: number; toConfirm: number; messages: { error: boolean; text: string }[] }>
   selection: Selection
   onSelect: (s: Selection) => void
   onConnect: (sourceId: string, outcomeId: string, targetId: string) => void
@@ -87,6 +88,30 @@ export const FlowCanvas = forwardRef<CanvasApi, Props>(function FlowCanvas(
 ) {
   const flow = useReactFlow()
   const [menu, setMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
+  // Hover "+" on empty canvas (n8n style): follows the pointer, opens the step list where it was clicked
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [plus, setPlus] = useState<{ x: number; y: number; clientX: number; clientY: number } | null>(null)
+  const [picker, setPicker] = useState<{ x: number; y: number; at: { x: number; y: number } } | null>(null)
+  const restTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  /** Shown once the pointer rests on empty canvas, just beside it, and stays put while the pointer heads towards it */
+  const showPlus = (e: React.MouseEvent) => {
+    clearTimeout(hideTimer.current)
+    const r = wrapRef.current?.getBoundingClientRect()
+    if (!r || picker) return
+    const x = e.clientX - r.left + 22
+    const y = e.clientY - r.top + 22
+    if (plus && Math.hypot(plus.x - x, plus.y - y) < 56) return
+    setPlus(null)
+    clearTimeout(restTimer.current)
+    const { clientX, clientY } = e
+    restTimer.current = setTimeout(() => setPlus({ x, y, clientX, clientY }), 220)
+  }
+  const hidePlus = () => {
+    clearTimeout(hideTimer.current)
+    clearTimeout(restTimer.current)
+    hideTimer.current = setTimeout(() => setPlus(null), 150)
+  }
 
   const stage = workflow.stages[stageId]
   const blocks = useMemo(() => stageBlocks(workflow), [workflow])
@@ -141,6 +166,7 @@ export const FlowCanvas = forwardRef<CanvasApi, Props>(function FlowCanvas(
             stageId: block.stageId,
             errors: isActive ? (issueCounts[node.id]?.errors ?? 0) : 0,
             toConfirm: isActive ? (issueCounts[node.id]?.toConfirm ?? 0) : 0,
+            messages: isActive ? (issueCounts[node.id]?.messages ?? []) : [],
             disabled: !st.enabled,
             inactive: !isActive,
             onAddNext: isActive ? onAddNext : undefined,
@@ -288,6 +314,7 @@ export const FlowCanvas = forwardRef<CanvasApi, Props>(function FlowCanvas(
 
   return (
     <div
+      ref={wrapRef}
       className="relative flex-1 min-w-0 h-full bg-[#f8fafc]"
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('application/wf-node')) {
@@ -333,6 +360,9 @@ export const FlowCanvas = forwardRef<CanvasApi, Props>(function FlowCanvas(
           setMenu(null)
           onSelect({ kind: 'edge', nodeId: e.source, outcomeId: e.sourceHandle! })
         }}
+        onPaneMouseMove={showPlus}
+        onPaneMouseLeave={hidePlus}
+        onMoveStart={() => setPlus(null)}
         onPaneClick={() => {
           setMenu(null)
           onSelect(null)
@@ -378,10 +408,47 @@ export const FlowCanvas = forwardRef<CanvasApi, Props>(function FlowCanvas(
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-2 text-center text-[#64748b]">
             <MousePointerClick className="w-8 h-8 text-[#94a3b8]" aria-hidden="true" />
-            <p className="text-sm font-medium text-[#0d212c]">Drag steps from the left to build this stage.</p>
-            <p className="text-xs">Or click a step in the list to add it here.</p>
+            <p className="text-sm font-medium text-[#0d212c]">Hover over the canvas and click + to add a step.</p>
+            <p className="text-xs">Then click a step to configure it on the right.</p>
           </div>
         </div>
+      )}
+
+      {plus && !picker && !menu && (
+        <button
+          type="button"
+          aria-label="Add a step here"
+          title="Add a step here"
+          onMouseEnter={() => clearTimeout(hideTimer.current)}
+          onMouseLeave={hidePlus}
+          onClick={() => {
+            const p = toStage(flow.screenToFlowPosition({ x: plus.clientX, y: plus.clientY }))
+            const r = wrapRef.current!.getBoundingClientRect()
+            setPicker({
+              x: Math.max(8, Math.min(plus.x + 20, r.width - 296)),
+              y: Math.max(8, Math.min(plus.y - 16, r.height - 428)),
+              at: { x: Math.max(0, p.x - 130), y: Math.max(0, p.y - 30) } })
+            setPlus(null)
+          }}
+          className="absolute z-20 w-8 h-8 -ml-4 -mt-4 rounded-full bg-white border border-[#36c0c9] text-[#36c0c9] shadow-md flex items-center justify-center cursor-pointer hover:bg-[#36c0c9] hover:text-white hover:scale-110 transition"
+          style={{ left: plus.x, top: plus.y }}
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      )}
+
+      {picker && stage && (
+        <NodePickerPopover
+          x={picker.x}
+          y={picker.y}
+          workflow={workflow}
+          stage={stage}
+          onClose={() => setPicker(null)}
+          onPick={(type) => {
+            onDropNode(type, picker.at)
+            setPicker(null)
+          }}
+        />
       )}
 
       {menu && (

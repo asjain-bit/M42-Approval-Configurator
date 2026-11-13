@@ -332,9 +332,9 @@ export const BranchesEditor: React.FC<{
 
       <button
         className={`${btnLink} self-start`}
-        onClick={() => onChange([...value, { id: newId('br'), label: `Outcome ${value.length + 1}`, rules: { match: 'all', rules: [] } }])}
+        onClick={() => onChange([...value, { id: newId('br'), label: `Custom case ${value.length + 1}`, rules: { match: 'all', rules: [] } }])}
       >
-        <Plus className="w-3.5 h-3.5" /> Add outcome
+        <Plus className="w-3.5 h-3.5" /> Add a custom case
       </button>
 
       {routing?.node.outcomes.some((o) => o.key === 'otherwise') && (

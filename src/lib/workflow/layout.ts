@@ -3,7 +3,7 @@ import { getNodeType } from '@/lib/registry/nodes'
 import type { Stage, WorkflowNode } from '@/types/workflow'
 import { stageEntry } from './graph'
 
-export const OUTCOME_SLOT = 104
+export const OUTCOME_SLOT = 150
 
 export function nodeSize(node: WorkflowNode): { width: number; height: number } {
   const def = getNodeType(node.type)
@@ -14,7 +14,7 @@ export function nodeSize(node: WorkflowNode): { width: number; height: number } 
 /** Top-to-bottom layout. Loop-back connections are ignored so they don't pull nodes upward. */
 export function autoLayout(stage: Stage): Record<string, { x: number; y: number }> {
   const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'TB', nodesep: 48, ranksep: 72, marginx: 20, marginy: 20 })
+  g.setGraph({ rankdir: 'TB', nodesep: 120, ranksep: 110, marginx: 20, marginy: 20 })
   g.setDefaultEdgeLabel(() => ({}))
   const nodes = Object.values(stage.nodes)
   for (const n of nodes) g.setNode(n.id, nodeSize(n))

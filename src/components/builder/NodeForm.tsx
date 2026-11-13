@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, CircleHelp, Copy, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleHelp, Copy, Lock, Trash2 } from 'lucide-react'
 import { categoryOf, getNodeType, nodeView, slaKind } from '@/lib/registry/nodes'
-import { eventNotificationsSection } from '@/lib/registry/shared'
+import { customText, eventNotificationsSection, isCustom } from '@/lib/registry/shared'
 import type { SchemaContext, SectionSchema } from '@/lib/registry/types'
 import type { SlaConfig, WorkflowNode } from '@/types/workflow'
 import { btnIcon, inputSmall, labelBase, textareaBase } from '@/components/ui/styles'
@@ -110,10 +110,14 @@ export const NodeForm: React.FC<Props> = ({
     const before = path.split('.').reduce<unknown>((a, k) => (a as Record<string, unknown>)?.[k], node.config)
     const config = setDeep(node.config, path, value)
     const next = def.onConfigChange?.(node, { ...node, config }, path) ?? { ...node, config }
-    onChange(
-      next,
-      { what: fieldLabel, coalesceKey: `${node.id}:${path}`, before: describeValue(before), after: describeValue(value) }
-    )
+    // A value the admin typed in themselves is logged as added manually
+    const manual = isCustom(value)
+    onChange(next, {
+      what: manual ? `${fieldLabel} (added manually)` : fieldLabel,
+      coalesceKey: `${node.id}:${path}`,
+      before: isCustom(before) ? customText(before) : describeValue(before),
+      after: manual ? customText(value) : describeValue(value),
+    })
   }
 
   const toggle = (id: string) => setClosed((c) => ({ ...c, [id]: !c[id] }))
@@ -158,7 +162,7 @@ export const NodeForm: React.FC<Props> = ({
             </div>
           )}
 
-          <Section id="general" title="General" open={!closed.general} onToggle={() => toggle('general')}>
+          <Section id="general" title="Basics" open={!closed.general} onToggle={() => toggle('general')}>
             <div id="field-name" className="rounded-lg">
               <label className={labelBase} htmlFor="node-name">
                 Name <span className="text-red-600">*</span>
@@ -215,7 +219,15 @@ export const NodeForm: React.FC<Props> = ({
           )}
 
           {node.outcomes.length > 0 && (
-            <Section id="outcomes" title="Connect the outcomes" open={!closed.outcomes} onToggle={() => toggle('outcomes')}>
+            <Section id="outcomes" title={def.key === 'step' ? 'Step 2 · Where each result leads' : 'Where each result leads'} open={!closed.outcomes} onToggle={() => toggle('outcomes')}>
+              {(routing.missing?.length ?? 0) > 0 && (
+                <div className="rounded-xl border border-[#fde8b3] bg-[#fef7e0] p-2.5 flex items-start gap-2 text-[11px] leading-relaxed text-[#7a4300]">
+                  <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>
+                    Fill in the mandatory fields to choose the next step: <strong>{routing.missing!.join(', ')}</strong>.
+                  </span>
+                </div>
+              )}
               <ul className="flex flex-col gap-2">
                 {node.outcomes.map((o) => (
                   <li
@@ -225,7 +237,9 @@ export const NodeForm: React.FC<Props> = ({
                       focusField === `outcome:${o.id}` ? 'border-[#dde3ea] bg-slate-50' : 'border-[#e2e8f0]'
                     }`}
                   >
-                    <div className="text-xs font-semibold text-[#0d212c] mb-1.5">{o.label}</div>
+                    <div className="text-xs text-[#64748b] mb-1.5">
+                      If the result is <span className="font-semibold text-[#0d212c]">“{o.label}”</span>
+                    </div>
                     <ThenGoTo outcomeKey={o.key} compact />
                   </li>
                 ))}
@@ -235,7 +249,7 @@ export const NodeForm: React.FC<Props> = ({
           )}
 
           {sla && (
-            <Section id="sla" title={sla === 'agent' ? 'Run timeout' : 'SLA and reminders'} open={!closed.sla} onToggle={() => toggle('sla')}>
+            <Section id="sla" title={sla === 'agent' ? 'Time limit for the agent' : 'Deadline and reminders'} open={!closed.sla} onToggle={() => toggle('sla')}>
               <div id="field-sla" className="rounded-lg">
                 <SlaBlock
                   node={node}

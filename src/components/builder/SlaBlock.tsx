@@ -7,9 +7,10 @@ import { TEMPLATES } from '@/lib/library'
 import type { CaseField, Reminder, SlaConfig, Stage, WorkflowNode } from '@/types/workflow'
 import { btnIcon, btnLink, helpText, inputSmall, labelBase } from '@/components/ui/styles'
 import { BreachActionEditor } from './BreachActionEditor'
+import { EmailPreview } from './EmailPreview'
 import { RecipientsEditor } from './RecipientsEditor'
 import { Toggle } from './fields/Toggle'
-import { Checkbox, Radio } from '@/components/ui/Choice'
+import { Radio } from '@/components/ui/Choice'
 
 interface Props {
   node: WorkflowNode
@@ -41,19 +42,25 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
   return (
     <div className="flex flex-col gap-4">
       <Toggle
-        label={agent ? 'Run timeout' : 'Time limit'}
+        label={agent ? 'Stop the agent if it takes too long' : 'Set a deadline'}
         checked={sla.enabled}
-        onChange={(v) => set({ enabled: v }, agent ? 'Run timeout' : 'Time limit')}
+        onChange={(v) =>
+          // Switching the limit on picks the breach action straight away: close the request and email the vendor
+          set(
+            { enabled: v, ...(v && !sla.breachAction && !agent ? { breachAction: { kind: 'escalate', to: [] } } : {}) },
+            agent ? 'Run timeout' : 'Time limit'
+          )
+        }
       />
       {!sla.enabled && (
         <p className="text-[11px] text-red-600 -mt-2">
-          Every {agent ? 'agent' : 'human'} step needs a {agent ? 'run timeout' : 'time limit'} and a breach action.
+          Every {agent ? 'agent' : 'person'} step needs a deadline and what happens if it is missed.
         </p>
       )}
       {sla.enabled && (
         <>
           <div>
-            <label className={labelBase}>{agent ? 'Stop the agent after' : 'Time limit'}</label>
+            <label className={labelBase}>{agent ? 'Stop the agent after' : 'Deadline'}</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -78,12 +85,12 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                 {!agent && <option value="calendarDays">Calendar days</option>}
               </select>
             </div>
-            {durationMissing && <p className="text-[11px] text-red-600 mt-1">Set a time limit.</p>}
+            {durationMissing && <p className="text-[11px] text-red-600 mt-1">Set how long they have.</p>}
           </div>
 
           {!agent && (
             <div>
-              <label className={labelBase}>Clock starts</label>
+              <label className={labelBase}>Count the deadline from</label>
               <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Clock starts">
                 {(
                   [
@@ -152,34 +159,13 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                       {!r.sendAt && <p className="text-[10px] text-[#64748b] mt-0.5">Uses {defaultReminderTime}</p>}
                     </div>
                   </div>
+                  <p className="text-[11px] text-[#64748b]">Sent by email.</p>
                   <div>
-                    <span className={labelBase}>Channels</span>
-                    <div className="flex items-center gap-4">
-                      {(
-                        [
-                          ['email', 'Email'],
-                          ['inApp', 'In-app'],
-                        ] as const
-                      ).map(([c, l]) => (
-                        <label key={c} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                          <Checkbox
-                            checked={r.channels.includes(c)}
-                            onChange={(e) =>
-                              setReminder(i, { channels: e.target.checked ? [...r.channels, c] : r.channels.filter((x) => x !== c) })
-                            }
-                          />
-                          {l}
-                        </label>
-                      ))}
-                    </div>
-                    {r.channels.length === 0 && <p className="text-[11px] text-red-600 mt-1">Choose at least one channel.</p>}
-                  </div>
-                  <div>
-                    <span className={labelBase}>Recipients</span>
+                    <span className={labelBase}>Send to</span>
                     <RecipientsEditor value={r.recipients} onChange={(recipients) => setReminder(i, { recipients })} caseFields={caseFields} />
                   </div>
                   <div>
-                    <label className={labelBase}>Template</label>
+                    <label className={labelBase}>Email template</label>
                     <select aria-label="Template" className={inputSmall} value={r.templateId} onChange={(e) => setReminder(i, { templateId: e.target.value })}>
                       <option value="">Choose…</option>
                       {TEMPLATES.map((t) => (
@@ -189,6 +175,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
                       ))}
                     </select>
                   </div>
+                  <EmailPreview templateId={r.templateId} override={r.email} onChange={(email) => setReminder(i, { email })} />
                 </div>
               ))}
               <button
@@ -219,7 +206,7 @@ export const SlaBlock: React.FC<Props> = ({ node, stage, agent, defaultReminderT
 
           <div>
             <span className={labelBase}>
-              When the {agent ? 'timeout' : 'time limit'} is missed <span className="text-red-600">*</span>
+              {agent ? 'If the agent takes too long' : 'If the deadline is missed'} <span className="text-red-600">*</span>
             </span>
             <BreachActionEditor
               value={sla.breachAction}
