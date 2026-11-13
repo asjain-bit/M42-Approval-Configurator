@@ -162,7 +162,7 @@ export const eventNotificationsSection: SectionSchema = {
       newItem: () => ({
         id: newId('evt'),
         when: 'stepStarts',
-        recipients: [{ kind: 'stepAssignees' }],
+        recipients: [],
         channels: ['email'],
         templateId: '',
       }),
@@ -177,7 +177,7 @@ export const eventNotificationsSection: SectionSchema = {
             ['overdue', 'The step is overdue'],
           ]),
         },
-        { key: 'recipients', label: 'Notify', kind: 'recipients' },
+        { key: 'recipients', label: 'Notify', kind: 'recipients', recipientKinds: ['role', 'team', 'vendor'] },
         { key: 'channels', label: 'Via', kind: 'multiselect', options: CHANNEL_OPTIONS },
         { key: 'templateId', label: 'Email template', kind: 'select', options: templateOptions, emailKey: 'email' },
       ],

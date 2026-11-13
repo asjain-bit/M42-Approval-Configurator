@@ -101,7 +101,7 @@ export const StageSidebar: React.FC<{
         </ol>
         <button
           onClick={onAdd}
-          className="mt-2 w-full flex items-center gap-2 px-2 py-2 rounded-xl border border-dashed border-[#cbd5e1] text-xs font-medium text-[#0f8a93] hover:border-[#36c0c9] hover:bg-[#f0fbfc] cursor-pointer"
+          className="mt-2 w-full flex items-center justify-center gap-2 px-2 py-2 rounded-xl border border-dashed border-[#cbd5e1] text-xs font-medium text-[#0f8a93] hover:border-[#36c0c9] hover:bg-[#f0fbfc] cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add stage
         </button>

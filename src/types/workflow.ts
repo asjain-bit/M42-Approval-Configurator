@@ -107,21 +107,27 @@ export interface Reminder {
   email?: { for: ID; text: string }
 }
 
-export type BreachAction =
+export type BreachAction = (
   | { kind: 'closeRequest'; statusLabel: string; notifyVendor: boolean; templateId?: ID; emailBody?: string }
   | { kind: 'escalate'; to: Recipient[] }
   | { kind: 'reassign'; to: Recipient[] }
   | { kind: 'notifyOnly'; to: Recipient[]; templateId: ID; email?: { for: ID; text: string } }
   | { kind: 'takeOutcome'; outcomeId: ID }
   | { kind: 'routeTo'; nodeId: ID }
+) & {
+  /** Also set the request's status to "At risk" when the deadline is missed */
+  markAtRisk?: boolean
+}
 
 export type BreachKind = BreachAction['kind']
 
 export type Recipient =
-  | { kind: 'role'; roleId: ID }
-  | { kind: 'team'; teamId: ID }
+  /** userIds: the people picked from the role or team; none picked means everyone in it */
+  | { kind: 'role'; roleId: ID; userIds?: ID[] }
+  | { kind: 'team'; teamId: ID; userIds?: ID[] }
   | { kind: 'user'; userId: ID }
-  | { kind: 'vendor' }
+  /** contacts: which of the vendor's contacts get it */
+  | { kind: 'vendor'; contacts?: string[] }
   | { kind: 'fromCaseField'; fieldKey: string }
   | { kind: 'stepAssignees' }
 

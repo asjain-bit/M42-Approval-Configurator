@@ -138,3 +138,10 @@ select {
 
 /* A form field that has a validation error */
 .field-error { outline: 2px solid #fca5a5; outline-offset: 4px; border-radius: 10px; }
+
+/* A step still being set up: no red error marks yet (mandatory * markers stay) */
+.quiet-issues p.text-red-600 { display: none; }
+.quiet-issues svg.text-red-600 { color: #94a3b8; }
+.quiet-issues .border-red-300, .quiet-issues .border-red-400 { border-color: #e2e8f0; }
+.quiet-issues .bg-red-50\/40 { background-color: transparent; }
+.quiet-issues .ring-red-200 { --tw-ring-color: transparent; }

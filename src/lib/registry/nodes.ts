@@ -164,7 +164,7 @@ const formSubmission: NodeTypeDef = {
       id: 'form',
       title: 'Form',
       fields: [
-        { key: 'formId', label: 'Form', kind: 'select', required: true, allowCustom: true, options: formOptions },
+        { key: 'formId', label: 'Form', kind: 'select', required: true, options: formOptions },
         {
           key: 'submitters',
           label: 'Who can submit',
@@ -673,16 +673,6 @@ const step: NodeTypeDef = {
           help: 'A role, a team, one person or the vendor.',
         },
         {
-          key: 'assigneeUser',
-          label: 'Person in this role',
-          kind: 'select',
-          required: true,
-          options: (_ctx, s) =>
-            (findRole(s.assignee)?.memberIds ?? []).map((id) => ({ value: id, label: findUser(id)?.name ?? id, hint: findUser(id)?.title })),
-          help: 'Who does this step for this role.',
-          showIf: (s) => !!findRole(s.assignee)?.memberIds?.length,
-        },
-        {
           key: '_perCase',
           label: '',
           kind: 'note',
@@ -752,7 +742,7 @@ const step: NodeTypeDef = {
           placeholder: 'e.g. Sign the agreement',
           showIf: (s) => s.action === 'custom',
         },
-        { key: 'formId', label: 'Form to fill in', kind: 'select', required: true, allowCustom: true, options: formOptions, showIf: is('human', 'submit') },
+        { key: 'formId', label: 'Form to fill in', kind: 'select', required: true, options: formOptions, showIf: is('human', 'submit') },
         {
           key: 'peopleFrom',
           label: 'Send to the people from',
@@ -931,8 +921,7 @@ const step: NodeTypeDef = {
     const c = n.config
     switch (actorOf(c)) {
       case 'human': {
-        const person = findRole(c.assignee) ? findUser(c.assigneeUser)?.name : undefined
-        const who = (person ? `${assigneeName(c.assignee)} · ${person}` : (assigneeName(c.assignee) ?? 'Nobody chosen')) + (isGroup(c.assignee) && Number(c.approvers) > 1 ? ` · ${c.approvers} people` : '')
+        const who = (assigneeName(c.assignee) ?? 'Nobody chosen') + (isGroup(c.assignee) && Number(c.approvers) > 1 ? ` · ${c.approvers} people` : '')
         return c.action === 'submit' ? `${who} · ${nameOf(c.formId, findForm) ?? 'No form selected'}` : who
       }
       case 'agent':

@@ -119,17 +119,26 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
 
   const caseFields = useMemo(() => (workflow ? caseDataDictionary(workflow) : []), [workflow])
   const issues = useMemo(() => (workflow && stage ? validateStage(workflow, stage, editor.allWorkflows) : []), [workflow, stage, editor.allWorkflows])
+  // Steps added in this session that the admin is still setting up: their issues stay quiet until they leave the step
+  const [drafting, setDrafting] = useState<Set<string>>(() => new Set())
+  const selectedId = selection?.kind === 'node' ? selection.id : null
+  useEffect(() => {
+    setDrafting((d) => {
+      const keep = [...d].filter((id) => id === selectedId)
+      return keep.length === d.size ? d : new Set(keep)
+    })
+  }, [selectedId])
   const issueCounts = useMemo(() => {
     const out: Record<string, { errors: number; toConfirm: number; messages: { error: boolean; text: string }[] }> = {}
     for (const i of issues) {
-      if (!i.nodeId) continue
+      if (!i.nodeId || drafting.has(i.nodeId)) continue
       out[i.nodeId] ??= { errors: 0, toConfirm: 0, messages: [] }
       if (i.severity === 'error') out[i.nodeId].errors++
       else out[i.nodeId].toConfirm++
       out[i.nodeId].messages.push({ error: i.severity === 'error', text: i.message })
     }
     return out
-  }, [issues])
+  }, [issues, drafting])
   const health = useMemo(
     () => (workflow ? Object.fromEntries(workflow.stageIds.map((id) => [id, stageHealth(workflow, workflow.stages[id])])) : {}),
     [workflow]
@@ -240,6 +249,7 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
       },
       entries
     )
+    setDrafting((d) => new Set(d).add(node.id))
     setSelection({ kind: 'node', id: node.id })
     setFocus((f) => ({ field: 'name', tick: f.tick + 1 }))
   }
@@ -521,7 +531,8 @@ export const StageBuilder: React.FC<{ workflowId: string; stageId: string }> = (
                 routing={routing}
                 focusField={focusField}
                 focusTick={focus.tick + (selection?.kind === 'edge' ? 1 : 0)}
-                issues={issues.filter((i) => i.nodeId === selectedNode.id && i.severity === 'error')}
+                issues={drafting.has(selectedNode.id) ? [] : issues.filter((i) => i.nodeId === selectedNode.id && i.severity === 'error')}
+                quiet={drafting.has(selectedNode.id)}
                 onGoToIssue={goToIssue}
                 onChange={updateNode}
                 onDelete={() => setDeletingId(selectedNode.id)}

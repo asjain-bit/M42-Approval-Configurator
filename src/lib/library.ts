@@ -446,7 +446,7 @@ export const CALENDARS: WorkingCalendar[] = [
   },
 ]
 
-export const STATUS_LABELS = ['To review', 'Upcoming', 'Completed', 'Rejected', 'On hold', 'Stopped']
+export const STATUS_LABELS = ['To review', 'Upcoming', 'At risk', 'Completed', 'Rejected', 'On hold', 'Stopped']
 
 /** People roles a case can hold (set by the Update case node) */
 export const CASE_ROLES = ['Sponsor', 'Lead sponsor', 'Co-sponsors', 'Owner']

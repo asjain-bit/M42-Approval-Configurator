@@ -36,13 +36,16 @@ const reminder = (days: number): Reminder => ({
 })
 
 
-const sla = (days: number | null, reminders: Reminder[] = [], breach: BreachAction | null = null): SlaConfig => ({
-  enabled: true,
-  duration: { value: days, unit: 'businessDays' },
-  clockStarts: 'onStepStart',
-  reminders,
-  breachAction: breach,
-})
+const sla = (days: number | null, reminders: Reminder[] = [], breachIn: BreachAction | null = null): SlaConfig => {
+  const breach = breachIn ? { ...breachIn, markAtRisk: true } : null
+  return {
+    enabled: true,
+    duration: { value: days, unit: 'businessDays' },
+    clockStarts: 'onStepStart',
+    reminders,
+    breachAction: breach,
+  }
+}
 
 /** Build a stage from specs, wiring outcomes by label → ref. Optional hand-placed positions (by ref) replace auto-layout. */
 function buildStage(name: string, description: string, specs: Spec[], positions?: Record<string, { x: number; y: number }>): Stage {

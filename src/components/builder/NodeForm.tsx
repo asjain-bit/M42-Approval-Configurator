@@ -30,6 +30,8 @@ interface Props {
   focusTick: number
   /** Errors to fix in this step; each one points at the field where it is fixed */
   issues?: Issue[]
+  /** The step is still being set up: hold back red error marks until the admin moves on */
+  quiet?: boolean
   onGoToIssue?: (issue: Issue) => void
   onChange: (next: WorkflowNode, change: NodeChange) => void
   onDelete: () => void
@@ -90,6 +92,7 @@ export const NodeForm: React.FC<Props> = ({
   focusField,
   focusTick,
   issues = [],
+  quiet,
   onGoToIssue,
   onChange,
   onDelete,
@@ -197,7 +200,7 @@ export const NodeForm: React.FC<Props> = ({
 
   return (
     <RoutingContext.Provider value={routing}>
-      <div className="flex flex-col h-full min-h-0">
+      <div className={`flex flex-col h-full min-h-0 ${quiet ? 'quiet-issues' : ''}`}>
         {/* Header */}
         <div className="px-4 py-3.5 border-b border-[#e2e8f0] flex items-start gap-3">
           <span className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${view.accent}`}>

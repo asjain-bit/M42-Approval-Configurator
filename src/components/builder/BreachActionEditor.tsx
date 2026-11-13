@@ -76,6 +76,13 @@ export const BreachActionEditor: React.FC<Props> = ({
         ))}
       </select>
       {invalid && !value && <p className="text-[11px] text-red-600 -mt-2">Choose what happens when the time limit is missed.</p>}
+      {value && value.kind !== 'closeRequest' && (
+        <Toggle
+          label="Update the request status to “At risk”"
+          checked={!!value.markAtRisk}
+          onChange={(v) => onChange({ ...value, markAtRisk: v })}
+        />
+      )}
 
       {value?.kind === 'closeRequest' && (
         <>
